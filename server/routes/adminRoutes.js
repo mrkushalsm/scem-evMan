@@ -34,23 +34,23 @@ const upload = multer({
 });
 
 // Questions
-router.post("/questions/create", requireAuth(), createProblem);
-router.post("/questions/import/:type", requireAuth(), upload.single('file'), importQuestions);
-router.put("/questions/:id/edit", requireAuth(), updateProblem);
-router.get("/questions/:id", requireAuth(), getProblemDetail);
-router.delete("/questions/:id", requireAuth(), deleteQuestion);
+router.post("/questions/create", requireAuth(), isAdmin, createProblem);
+router.post("/questions/import/:type", requireAuth(), isAdmin, upload.single('file'), importQuestions);
+router.put("/questions/:id/edit", requireAuth(), isAdmin, updateProblem);
+router.get("/questions/:id", requireAuth(), isAdmin, getProblemDetail);
+router.delete("/questions/:id", requireAuth(), isAdmin, deleteQuestion);
 
 
 // Contests
-router.get("/tests", requireAuth(), getAdminContests);
-router.get("/tests/:id", requireAuth(), getAdminContestDetail);
-router.post("/tests/create", requireAuth(), createContest);
-router.put("/tests/:id/edit", requireAuth(), updateContest);
-router.delete("/tests/:id", requireAuth(), deleteContest);
+router.get("/tests", requireAuth(), isAdmin, getAdminContests);
+router.get("/tests/:id", requireAuth(), isAdmin, getAdminContestDetail);
+router.post("/tests/create", requireAuth(), isAdmin, createContest);
+router.put("/tests/:id/edit", requireAuth(), isAdmin, updateContest);
+router.delete("/tests/:id", requireAuth(), isAdmin, deleteContest);
 router.get("/tests/:id/result", requireAuth(), isAdmin, getAdminContestResults);
 
 // Dashboard Stats
-router.get("/stats", requireAuth(), getAdminStats);
+router.get("/stats", requireAuth(), isAdmin, getAdminStats);
 
 // Generic Data Endpoints
 router.post("/data", requireAuth(), getData);
