@@ -7,7 +7,7 @@ const { getJudge } = require("@pomelo/code-gen");
 // --- Questions ---
 
 // @desc Create a new problem
-const createProblem = async (req, res) => {
+const createProblem = async (req, res, next) => {
     try {
         await connectDB();
         const {
@@ -75,12 +75,12 @@ const createProblem = async (req, res) => {
         await newQuestion.save();
         res.status(200).json({ success: true, problemId: newQuestion._id });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Update an existing problem
-const updateProblem = async (req, res) => {
+const updateProblem = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
@@ -148,12 +148,12 @@ const updateProblem = async (req, res) => {
 
         res.status(200).json({ success: true, problemId: question._id });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Get problem details
-const getProblemDetail = async (req, res) => {
+const getProblemDetail = async (req, res, next) => {
     try {
         await connectDB();
         const question = await Question.findById(req.params.id);
@@ -161,12 +161,12 @@ const getProblemDetail = async (req, res) => {
 
         res.status(200).json({ success: true, problem: question });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Delete a problem
-const deleteQuestion = async (req, res) => {
+const deleteQuestion = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
@@ -177,14 +177,14 @@ const deleteQuestion = async (req, res) => {
 
         res.status(200).json({ success: true, message: 'Question deleted successfully' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // --- Contests ---
 
 // @desc Get all contests for admin dashboard
-const getAdminContests = async (req, res) => {
+const getAdminContests = async (req, res, next) => {
     try {
         await connectDB();
         // Return summary fields
@@ -243,12 +243,12 @@ const getAdminContests = async (req, res) => {
 
         res.status(200).json({ success: true, contests: summary });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Get detailed contest information
-const getAdminContestDetail = async (req, res) => {
+const getAdminContestDetail = async (req, res, next) => {
     try {
         await connectDB();
         const contest = await Contest.findById(req.params.id);
@@ -262,12 +262,12 @@ const getAdminContestDetail = async (req, res) => {
 
         res.status(200).json({ success: true, contest: contestWithQuestions });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Create a new contest
-const createContest = async (req, res) => {
+const createContest = async (req, res, next) => {
     try {
         await connectDB();
         const { title, description, duration, problemIds, rules, author } = req.body;
@@ -306,12 +306,12 @@ const createContest = async (req, res) => {
         await newContest.save();
         res.status(200).json({ success: true, contestId: newContest._id });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Clone an existing contest
-const cloneContest = async (req, res) => {
+const cloneContest = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
@@ -348,12 +348,12 @@ const cloneContest = async (req, res) => {
         await newContest.save();
         res.status(200).json({ success: true, contestId: newContest._id, joinId: newContest.joinId });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Update an existing contest
-const updateContest = async (req, res) => {
+const updateContest = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
@@ -382,12 +382,12 @@ const updateContest = async (req, res) => {
 
         res.status(200).json({ success: true });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Get contest results
-const getAdminContestResults = async (req, res) => {
+const getAdminContestResults = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
@@ -423,12 +423,12 @@ const getAdminContestResults = async (req, res) => {
             results: submissions // Empty array if no submissions
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Delete a contest
-const deleteContest = async (req, res) => {
+const deleteContest = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
@@ -454,12 +454,12 @@ const deleteContest = async (req, res) => {
 
         res.status(200).json({ success: true, message: 'Contest deleted successfully' });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Get admin dashboard statistics
-const getAdminStats = async (req, res) => {
+const getAdminStats = async (req, res, next) => {
     try {
         await connectDB();
         const now = new Date();
@@ -523,13 +523,12 @@ const getAdminStats = async (req, res) => {
             questionBank
         });
     } catch (err) {
-        console.log(err);
-        return res.status(500).json({ success: false, message: err.message });
+        return next(err);
     }
 };
 
 // @desc Import questions from CSV
-const importQuestions = async (req, res) => {
+const importQuestions = async (req, res, next) => {
     try {
         await connectDB();
         const { type } = req.params; // 'mcq' or 'coding'
@@ -668,13 +667,13 @@ const importQuestions = async (req, res) => {
             errors: errors.length > 0 ? errors : undefined,
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc Get detailed submission data for a single student attempt
 // NOTE: the route param is named :submissionId but the frontend actually passes a userId
-const getAdminSubmissionDetail = async (req, res) => {
+const getAdminSubmissionDetail = async (req, res, next) => {
     try {
         await connectDB();
         const { contestId, submissionId: userId } = req.params;
@@ -693,7 +692,7 @@ const getAdminSubmissionDetail = async (req, res) => {
 
         res.status(200).json({ success: true, submission });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 

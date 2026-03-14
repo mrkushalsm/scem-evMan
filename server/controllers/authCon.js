@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
-const handleLogin = async (req, res) => {
+const handleLogin = async (req, res, next) => {
     try {
         const { SignJWT } = await import('jose');
         const { email, password } = req.body;
@@ -44,13 +44,11 @@ const handleLogin = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Login error:', error.message);
-        console.error('Full error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        next(error);
     }
 }
 
-const handleRegister = async (req, res) => {
+const handleRegister = async (req, res, next) => {
     try {
         const { SignJWT } = await import('jose');
         const { name, email, password } = req.body;
@@ -101,8 +99,7 @@ const handleRegister = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ message: 'Server error' });
+        next(error);
     }
 }
 
