@@ -7,7 +7,7 @@ const { getJudge } = require('@pomelo/code-gen');
 // @desc    Validate 6-digit Join ID (OTP)
 // @route   POST /api/contest/validate
 // @access  Public
-const validateJoinId = async (req, res) => {
+const validateJoinId = async (req, res, next) => {
     try {
         const { joinId } = req.body;
 
@@ -28,14 +28,14 @@ const validateJoinId = async (req, res) => {
             title: contest.title
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
+        return next(error);
     }
 };
 
 // @desc    Manage violations in a contest
 // @route   POST /api/contests/:id/violation
 // @access  Private (requires authentication)
-const manageViolations = async (req, res) => {
+const manageViolations = async (req, res, next) => {
     try {
         const { userId, details } = req.body;
         const contest = await Contest.findById(req.params.id);
@@ -67,7 +67,7 @@ const manageViolations = async (req, res) => {
 
         res.json({ message: 'Violation recorded successfully', violation });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        next(error);
     }
 };
 
@@ -94,7 +94,7 @@ const checkTestId = async (req, res) => {
 };
 
 // @desc    Get contest landing details
-const getContestLanding = async (req, res) => {
+const getContestLanding = async (req, res, next) => {
     try {
         const contest = req.contest;
         const now = new Date();
@@ -122,12 +122,12 @@ const getContestLanding = async (req, res) => {
             }
         });
     } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        return next(error);
     }
 };
 
 // @desc    Get contest data for attempt
-const getContestData = async (req, res) => {
+const getContestData = async (req, res, next) => {
     try {
         const contest = req.contest;
 
@@ -179,12 +179,12 @@ const getContestData = async (req, res) => {
             }
         });
     } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        return next(error);
     }
 };
 
 // @desc    Start test (User Attempt)
-const startTest = async (req, res) => {
+const startTest = async (req, res, next) => {
     try {
         console.log("StartTest: Initiated");
         const contest = req.contest;
@@ -232,13 +232,12 @@ const startTest = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("StartTest Error:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
 // @desc    Get questions for a specific test
-const getTestQuestions = async (req, res) => {
+const getTestQuestions = async (req, res, next) => {
     try {
         const { id: testId } = req.params;
         const contest = await Contest.findById(testId);
@@ -264,24 +263,24 @@ const getTestQuestions = async (req, res) => {
 
         return res.json({ success: true, data: { questions: questionsData } });
     } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        return next(error);
     }
 };
 
 // @desc    List all contests
-const listAllContests = async (req, res) => {
+const listAllContests = async (req, res, next) => {
     try {
         const contests = await Contest.find({}, { _id: 1, title: 1, description: 1 });
         return res.json({ success: true, data: { contests } });
     } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        return next(error);
     }
 };
 
 // @desc    Get ranked leaderboard for a contest
 // @route   GET /api/contest/:id/leaderboard
 // @access  Private (Admin only)
-const getLeaderboard = async (req, res) => {
+const getLeaderboard = async (req, res, next) => {
     try {
         const contest = await Contest.findById(req.params.id);
         if (!contest) {
@@ -336,12 +335,12 @@ const getLeaderboard = async (req, res) => {
             }
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
+        return next(error);
     }
 };
 
 // @desc    End Test (Mark as Completed)
-const endTest = async (req, res) => {
+const endTest = async (req, res, next) => {
     try {
         console.log("EndTest: Initiated");
         const contestId = req.params.id || req.body.contestId || (req.contest && req.contest._id);
@@ -371,8 +370,7 @@ const endTest = async (req, res) => {
             message: 'Test completed successfully'
         });
     } catch (error) {
-        console.error("EndTest Error:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        next(error);
     }
 };
 
