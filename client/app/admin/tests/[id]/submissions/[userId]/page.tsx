@@ -1,7 +1,6 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { format } from "date-fns";
 import {
     ArrowLeft,
     CheckCircle2,
@@ -16,33 +15,89 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { db } from "@/lib/db";
 
-import { getTestById, getQuestionById } from "@/constants/test-data";
-import { MCQProblem } from "@/types/problem/problem.types";
+type SubmissionStatus =
+    | "PASSED"
+    | "FAILED"
+    | "PARTIAL"
+    | "Accepted"
+    | "Wrong Answer"
+    | "Time Limit Exceeded"
+    | "Runtime Error"
+    | "Compilation Error"
+    | "Pending";
 
-// --- Types for Submissions ---
+interface PopulatedUser {
+    _id: string;
+    name?: string;
+}
+
+interface ContestRecord {
+    _id: string;
+    title?: string;
+}
+
+interface PopulatedQuestion {
+    _id: string;
+    title: string;
+    marks: number;
+    questionType?: string;
+    options?: string[];
+    correctAnswer?: string;
+    testcases?: { isVisible?: boolean }[];
+}
+
+interface RawTestCaseResult {
+    testCase: number;
+    passed: boolean;
+    input?: string;
+    expectedOutput?: string;
+    actualOutput?: string;
+    error?: string;
+    status?: string;
+}
+
+interface RawSubmissionItem {
+    question?: PopulatedQuestion | null;
+    score?: number;
+    status?: SubmissionStatus;
+    answer?: string[];
+    code?: string;
+    language?: string;
+    testCaseResults?: RawTestCaseResult[];
+}
+
+interface SubmissionDocument {
+    user?: PopulatedUser | null;
+    totalScore?: number;
+    submittedAt?: string;
+    createdAt?: string;
+    submissions?: RawSubmissionItem[];
+}
+
 interface SubmissionDetail {
-    questionId: number;
+    questionId: string;
     type: "mcq" | "coding";
     questionTitle: string;
     points: number;
     earnedPoints: number;
-    status: "PASSED" | "FAILED" | "PARTIAL";
-
-    // MCQ specific
+    status: SubmissionStatus;
     selectedOptions?: string[];
     correctOptions?: string[];
     options?: { id: string; text: string }[];
-
-    // Coding specific
     submittedCode?: string;
     language?: string;
     testCases?: {
         id: number;
         isHidden: boolean;
         passed: boolean;
+        input?: string;
+        expectedOutput?: string;
+        actualOutput?: string;
+        error?: string;
+        status?: string;
     }[];
 }
 
@@ -57,162 +112,193 @@ interface UserSubmission {
     details: SubmissionDetail[];
 }
 
+function isMCQQuestion(question: PopulatedQuestion) {
+    return question.questionType === "Single Correct" || question.questionType === "Multiple Correct";
+}
 
-export default function SubmissionDetailPage() {
-    const { id, userId } = useParams();
-    const router = useRouter();
-
-    const [loading, setLoading] = useState(true);
-    const [data, setData] = useState<UserSubmission | null>(null);
-
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-
-            const test = getTestById(id as string);
-            if (!test) {
-                setLoading(false);
-                return;
-            }
-
-            const participant = test.participants?.find(p => p.userId === userId);
-
-            // Mocking submission details based on questions in the test
-            const detailsUnfiltered = (test.problems || []).map(qId => {
-                const q = getQuestionById(Number(qId));
-                if (!q) return null;
-
-                if (q.questionType === "Single Correct" || q.questionType === "Multiple Correct") {
-                    const mcq = q as MCQProblem;
-                    const options = (mcq.options || []).map((opt, i) => {
-                        if (typeof opt === 'string') return { id: String.fromCharCode(97 + i), text: opt };
-                        return opt;
-                    });
-
-                    const detail: SubmissionDetail = {
-                        questionId: typeof q.id === 'string' ? parseInt(q.id) : q.id,
-                        type: "mcq",
-                        questionTitle: q.title,
-                        points: q.marks,
-                        earnedPoints: Math.random() > 0.3 ? q.marks : 0,
-                        status: Math.random() > 0.3 ? "PASSED" : "FAILED",
-                        selectedOptions: [options[0]?.id],
-                        correctOptions: [mcq.correctAnswer || options[0]?.id],
-                        options: options as { id: string; text: string }[]
-                    };
-                    return detail;
-                } else {
-                    const detail: SubmissionDetail = {
-                        questionId: typeof q.id === 'string' ? parseInt(q.id) : q.id,
-                        type: "coding",
-                        questionTitle: q.title,
-                        points: q.marks,
-                        earnedPoints: Math.random() > 0.5 ? q.marks : q.marks / 2,
-                        status: Math.random() > 0.5 ? "PASSED" : "PARTIAL",
-                        submittedCode: `// User Solution for ${q.title}\nfunction solve() {\n  // Implementation details\n  return true;\n}`,
-                        language: "javascript",
-                        testCases: [
-                            { id: 1, isHidden: false, passed: true },
-                            { id: 2, isHidden: false, passed: true },
-                            { id: 3, isHidden: true, passed: Math.random() > 0.5 },
-                            { id: 4, isHidden: true, passed: false },
-                        ]
-                    };
-                    return detail;
-                }
-            });
-            const details = detailsUnfiltered.filter((d): d is SubmissionDetail => d !== null);
-
-            setData({
-                userId: userId as string,
-                userName: participant?.name || "User",
-                testId: id as string,
-                testName: test.title,
-                totalScore: participant?.score || 0,
-                maxScore: details.reduce((sum, d) => sum + d.points, 0),
-                submittedAt: participant?.submittedAt || new Date().toISOString(),
-                details
-            });
-
-            setTimeout(() => setLoading(false), 500);
-        };
-
-        fetchData();
-    }, [id, userId]);
-
-    if (loading) {
-        return (
-            <div className="container mx-auto p-8 space-y-6">
-                <Skeleton className="h-10 w-1/4" />
-                <Skeleton className="h-24 w-full" />
-                <div className="space-y-4">
-                    <Skeleton className="h-40 w-full" />
-                    <Skeleton className="h-40 w-full" />
-                </div>
-            </div>
-        );
+function mapSubmissionDetail(submissionItem: RawSubmissionItem): SubmissionDetail | null {
+    const question = submissionItem.question;
+    if (!question) {
+        return null;
     }
 
-    if (!data) return <div className="p-8">Submission not found</div>;
+    if (isMCQQuestion(question)) {
+        const options = (question.options || []).map((option, index) => ({
+            id: String.fromCharCode(97 + index),
+            text: option,
+        }));
+
+        return {
+            questionId: question._id,
+            type: "mcq",
+            questionTitle: question.title,
+            points: question.marks,
+            earnedPoints: submissionItem.score || 0,
+            status: (submissionItem.score || 0) === question.marks ? "PASSED" : "FAILED",
+            selectedOptions: submissionItem.answer || [],
+            correctOptions: (question.correctAnswer || "")
+                .split(",")
+                .map((value) => value.trim())
+                .filter(Boolean),
+            options,
+        };
+    }
+
+    return {
+        questionId: question._id,
+        type: "coding",
+        questionTitle: question.title,
+        points: question.marks,
+        earnedPoints: submissionItem.score || 0,
+        status: submissionItem.status || "Pending",
+        submittedCode: submissionItem.code,
+        language: submissionItem.language,
+        testCases: (submissionItem.testCaseResults || []).map((testCase) => ({
+            id: testCase.testCase,
+            isHidden: !question.testcases?.[testCase.testCase - 1]?.isVisible,
+            passed: testCase.passed,
+            input: testCase.input,
+            expectedOutput: testCase.expectedOutput,
+            actualOutput: testCase.actualOutput,
+            error: testCase.error,
+            status: testCase.status,
+        })),
+    };
+}
+
+function formatSubmittedAt(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return "Unknown";
+    }
+
+    return format(date, "MMM d, yyyy, h:mm a");
+}
+
+function getSubmissionStatusVariant(status: SubmissionStatus): "default" | "destructive" | "secondary" {
+    if (status === "PASSED" || status === "Accepted") {
+        return "default";
+    }
+
+    if (status === "FAILED" || ["Wrong Answer", "Time Limit Exceeded", "Runtime Error", "Compilation Error"].includes(status)) {
+        return "destructive";
+    }
+
+    return "secondary";
+}
+
+function formatLanguage(language?: string) {
+    if (!language) {
+        return "Unknown";
+    }
+
+    return language.charAt(0).toUpperCase() + language.slice(1);
+}
+
+export default async function SubmissionDetailPage({
+    params,
+}: {
+    params: Promise<{ id: string; userId: string }>;
+}) {
+    const { id: contestId, userId } = await params;
+
+    const submissionData = await db.findOne<SubmissionDocument>(
+        "submissions",
+        {
+            contest: contestId,
+            user: userId,
+        },
+        { populate: ["user", "submissions.question"] }
+    );
+
+    if (!submissionData) {
+        notFound();
+    }
+
+    const contest = await db.findOne<ContestRecord>("contests", { _id: contestId });
+
+    const details = (submissionData.submissions || [])
+        .map(mapSubmissionDetail)
+        .filter((detail): detail is SubmissionDetail => detail !== null);
+
+    const data: UserSubmission = {
+        userId,
+        userName: submissionData.user?.name || "Unknown User",
+        testId: contestId,
+        testName: contest?.title || "Unknown Test",
+        totalScore: submissionData.totalScore || 0,
+        maxScore: details.reduce((sum, detail) => sum + detail.points, 0),
+        submittedAt: submissionData.submittedAt || submissionData.createdAt || "",
+        details,
+    };
 
     return (
         <div className="flex-1 overflow-y-auto bg-background">
-            <div className="container mx-auto p-8 space-y-8 pb-16">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                            <ArrowLeft className="h-5 w-5" />
+            <div className="container mx-auto space-y-8 p-6 pb-16 lg:p-10">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex items-start gap-4">
+                        <Button variant="outline" size="icon" className="mt-1 shrink-0" asChild>
+                            <Link href={`/admin/tests/${contestId}/result`}>
+                                <ArrowLeft className="h-5 w-5" />
+                            </Link>
                         </Button>
-                        <div>
+                        <div className="space-y-1">
                             <h1 className="text-3xl font-bold tracking-tight text-foreground">Submission Detail</h1>
-                            <p className="text-mountain-meadow-600 font-medium">{data.userName} • {data.testName}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {data.userName} / {data.testName}
+                            </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="text-lg py-1 px-4 font-mono bg-background">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Badge variant="outline" className="px-4 py-1 font-mono text-sm sm:text-base">
                             Score: {data.totalScore} / {data.maxScore}
                         </Badge>
-                        <Button variant="outline" size="sm" onClick={() => router.push(`/admin/users/${data.userId}`)}>
-                            <User className="mr-2 h-4 w-4" />
-                            Profile
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={`/admin/users/${data.userId}`}>
+                                <User className="mr-2 h-4 w-4" />
+                                Profile
+                            </Link>
                         </Button>
                     </div>
                 </div>
 
                 <Separator className="bg-border/50" />
 
-                {/* Summary Cards */}
                 <div className="grid gap-6 md:grid-cols-3">
-                    <StatItem icon={<User className="h-4 w-4" />} label="Candidate" value={data.userName} />
+                    <StatItem icon={<User className="h-4 w-4" />} label="Candidate" value={data.userName} mono={false} />
                     <StatItem icon={<Trophy className="h-4 w-4" />} label="Total Score" value={`${data.totalScore} / ${data.maxScore}`} />
-                    <StatItem icon={<Clock className="h-4 w-4" />} label="Submitted On" value={format(new Date(data.submittedAt), "MMM d, yyyy, h:mm a")} />
+                    <StatItem icon={<Clock className="h-4 w-4" />} label="Submitted On" value={formatSubmittedAt(data.submittedAt)} mono={false} />
                 </div>
 
-                {/* Submissions List */}
                 <div className="space-y-8">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-700 dark:text-slate-400">
+                        <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
                             Questions & Responses
                         </h2>
-                        <Badge variant="secondary" className="font-mono">{data.details.length} Items</Badge>
+                        <Badge variant="secondary" className="font-mono">
+                            {data.details.length} Items
+                        </Badge>
                     </div>
 
                     <div className="grid gap-6">
                         {data.details.map((detail, idx) => (
                             <div key={idx}>
-                                <Card className="overflow-hidden border-border/50 bg-card/30 backdrop-blur-sm hover:bg-card/40 transition-colors">
-                                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
-                                        <div className="space-y-1">
+                                <Card className="overflow-hidden border-border bg-card shadow-sm">
+                                    <CardHeader className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="space-y-2">
                                             <div className="flex items-center gap-2">
-                                                {detail.type === "mcq" ? <HelpCircle className="h-4 w-4 text-blue-400" /> : <Code2 className="h-4 w-4 text-purple-400" />}
-                                                <CardTitle className="text-lg">{detail.questionTitle}</CardTitle>
+                                                {detail.type === "mcq" ? (
+                                                    <HelpCircle className="h-4 w-4 text-primary" />
+                                                ) : (
+                                                    <Code2 className="h-4 w-4 text-primary" />
+                                                )}
+                                                <CardTitle className="text-lg leading-tight">{detail.questionTitle}</CardTitle>
                                             </div>
-                                            <CardDescription>
+                                            <CardDescription className="text-sm">
                                                 Points Earned: <span className="font-mono font-medium text-foreground">{detail.earnedPoints}</span> / {detail.points}
                                             </CardDescription>
                                         </div>
-                                        <Badge variant={detail.status === "PASSED" ? "default" : detail.status === "FAILED" ? "destructive" : "secondary"}>
+                                        <Badge variant={getSubmissionStatusVariant(detail.status)} className="w-fit">
                                             {detail.status}
                                         </Badge>
                                     </CardHeader>
@@ -220,18 +306,18 @@ export default function SubmissionDetailPage() {
                                         {detail.type === "mcq" ? (
                                             <div className="grid gap-2">
                                                 {detail.options?.map((opt) => {
-                                                    const isSelected = detail.selectedOptions?.includes(opt.id);
+                                                    const isSelected = detail.selectedOptions?.includes(opt.text);
                                                     const isCorrect = detail.correctOptions?.includes(opt.id);
 
-                                                    let appearance = "bg-muted/20 border-transparent text-muted-foreground";
-                                                    if (isSelected && isCorrect) appearance = "bg-green-500/10 border-green-500/30 text-green-500";
-                                                    else if (isSelected && !isCorrect) appearance = "bg-red-500/10 border-red-500/30 text-red-500";
-                                                    else if (!isSelected && isCorrect) appearance = "bg-green-500/5 border-green-500/10 text-green-500/60";
+                                                    let appearance = "border-border bg-muted/30 text-muted-foreground";
+                                                    if (isSelected && isCorrect) appearance = "border-primary/30 bg-primary/10 text-primary";
+                                                    else if (isSelected && !isCorrect) appearance = "border-destructive/30 bg-destructive/10 text-destructive";
+                                                    else if (!isSelected && isCorrect) appearance = "border-primary/20 bg-primary/5 text-primary";
 
                                                     return (
                                                         <div
                                                             key={opt.id}
-                                                            className={`p-4 rounded-xl border flex items-center justify-between transition-all ${appearance}`}
+                                                            className={`flex items-center justify-between rounded-xl border p-4 ${appearance}`}
                                                         >
                                                             <span className="text-sm font-medium">{opt.text}</span>
                                                             <div className="flex gap-2">
@@ -244,31 +330,86 @@ export default function SubmissionDetailPage() {
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
-                                                <div className="relative group">
-                                                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Badge variant="secondary" className="font-mono text-[10px]">{detail.language}</Badge>
+                                                <div className="space-y-3">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <h4 className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Submitted Code</h4>
+                                                        <Badge variant="outline" className="font-mono text-[11px]">
+                                                            {formatLanguage(detail.language)}
+                                                        </Badge>
                                                     </div>
-                                                    <div className="bg-zinc-950 rounded-xl p-5 font-mono text-sm overflow-x-auto border border-white/5 shadow-2xl">
-                                                        <pre className="text-zinc-300">
+                                                    <div className="overflow-x-auto rounded-xl border border-border bg-muted/20 p-4 font-mono text-sm">
+                                                        <pre className="text-foreground">
                                                             <code>{detail.submittedCode}</code>
                                                         </pre>
                                                     </div>
                                                 </div>
 
-                                                <div className="space-y-4 px-1 pt-2">
-                                                    <h4 className="text-xs font-black uppercase tracking-[0.15em] text-foreground/80">Test Verification</h4>
-                                                    <div className="flex flex-wrap gap-3">
-                                                        {detail.testCases?.map(tc => (
-                                                            <div
+                                                <div className="space-y-4 pt-2">
+                                                    <h4 className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">Test Verification</h4>
+                                                    <div className="flex flex-col gap-3">
+                                                        {detail.testCases?.map((tc) => (
+                                                            <details
                                                                 key={tc.id}
-                                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border-2 transition-all ${tc.passed
-                                                                    ? "bg-green-500/20 border-green-500/40 text-green-700 dark:text-green-400 shadow-lg shadow-green-500/20"
-                                                                    : "bg-red-500/20 border-red-500/40 text-red-700 dark:text-red-400 shadow-lg shadow-red-500/20"
-                                                                    }`}
+                                                                className={`overflow-hidden rounded-lg border ${
+                                                                    tc.passed ? "border-primary/20 bg-primary/5" : "border-destructive/20 bg-destructive/5"
+                                                                }`}
                                                             >
-                                                                {tc.passed ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                                                <span className="font-bold">{tc.isHidden ? "Hidden" : "Visible"} Test #{tc.id}</span>
-                                                            </div>
+                                                                <summary
+                                                                    className={`flex cursor-pointer items-center gap-3 px-4 py-3 text-xs font-semibold ${
+                                                                        tc.passed ? "text-primary" : "text-destructive"
+                                                                    }`}
+                                                                >
+                                                                    {tc.passed ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                                                                    <span>{tc.isHidden ? "Hidden" : "Visible"} Test #{tc.id}</span>
+                                                                    {!tc.passed && tc.status && (
+                                                                        <Badge variant="outline" className="ml-auto border-destructive/30 bg-destructive/10 font-mono text-[10px] text-destructive">
+                                                                            {tc.status}
+                                                                        </Badge>
+                                                                    )}
+                                                                    {tc.passed && (
+                                                                        <Badge variant="outline" className="ml-auto border-primary/30 bg-primary/10 font-mono text-[10px] text-primary">
+                                                                            Passed
+                                                                        </Badge>
+                                                                    )}
+                                                                </summary>
+
+                                                                {!tc.isHidden && (tc.input || tc.expectedOutput || tc.error) && (
+                                                                    <div className="space-y-3 border-t border-border/60 bg-background px-4 pb-4 pt-3">
+                                                                        {tc.input && (
+                                                                            <div className="space-y-1">
+                                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Input</div>
+                                                                                <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-2 font-mono text-[11px] text-foreground">
+                                                                                    {tc.input}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {tc.expectedOutput && (
+                                                                            <div className="space-y-1">
+                                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Expected Output</div>
+                                                                                <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-2 font-mono text-[11px] text-foreground">
+                                                                                    {tc.expectedOutput}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {tc.actualOutput && !tc.passed && (
+                                                                            <div className="space-y-1">
+                                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Actual Output</div>
+                                                                                <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-destructive/20 bg-destructive/10 p-2 font-mono text-[11px] text-destructive">
+                                                                                    {tc.actualOutput}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {tc.error && (
+                                                                            <div className="space-y-1">
+                                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-destructive">Error Logs</div>
+                                                                                <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-destructive/20 bg-destructive/10 p-2 font-mono text-[11px] text-destructive">
+                                                                                    {tc.error}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </details>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -285,17 +426,16 @@ export default function SubmissionDetailPage() {
     );
 }
 
-function StatItem({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
+function StatItem({ icon, label, value, mono = true }: { icon: React.ReactNode; label: string; value: string; mono?: boolean }) {
     return (
-        <Card className="bg-card/30 border-border/50 relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary/40 transition-colors" />
-            <CardContent className="pt-6 flex items-center gap-4">
-                <div className="p-3 bg-background rounded-xl border border-border/50 text-muted-foreground shadow-sm group-hover:scale-110 transition-transform">
+        <Card className="border-border bg-card shadow-sm">
+            <CardContent className="flex items-center gap-4 pt-6">
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-muted-foreground">
                     {icon}
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">{label}</p>
-                    <p className="text-lg font-bold font-mono">{value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+                    <p className={mono ? "font-mono text-lg font-bold text-foreground" : "text-lg font-semibold text-foreground"}>{value}</p>
                 </div>
             </CardContent>
         </Card>
