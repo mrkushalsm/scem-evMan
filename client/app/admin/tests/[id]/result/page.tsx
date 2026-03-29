@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 import {
+    ArrowLeft,
     Users,
     Award,
-    User,
     ExternalLink,
 } from "lucide-react";
 
@@ -18,8 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import React from "react";
 import { notFound } from "next/navigation";
+import { format } from "date-fns";
 
 /* ---------- Types ---------- */
 interface Participant {
@@ -57,6 +57,15 @@ interface MongoSubmission {
     user?: MongoUser;
     totalScore: number;
     submittedAt: string;
+}
+
+function formatSubmittedAt(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return "Unknown";
+    }
+
+    return format(date, "MMM d, yyyy, h:mm a");
 }
 
 export default async function AdminTestResultPage({ params }: { params: Promise<{ id: string }> }) {
@@ -104,128 +113,103 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
     };
 
     return (
-        <div className="flex-1 overflow-auto bg-background selection:bg-mountain-meadow-200/30">
-            <div className="container mx-auto p-6 lg:p-10 space-y-12">
-                {/* Header Section */}
-                <header className="relative space-y-2">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mountain-meadow-100/30 border border-mountain-meadow-200/50 text-mountain-meadow-700 text-xs font-bold tracking-widest uppercase mb-2">
-                        <Award className="h-3 w-3" />
-                        Test Analytics
+        <div className="flex-1 overflow-auto bg-background">
+            <div className="container mx-auto space-y-8 p-6 pb-16 lg:p-10">
+                <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex items-start gap-4">
+                        <Button variant="outline" size="icon" className="mt-1 shrink-0" asChild>
+                            <Link href={`/admin/tests/${data.id}`}>
+                                <ArrowLeft className="h-5 w-5" />
+                            </Link>
+                        </Button>
+                        <div className="space-y-2">
+                            <Badge variant="outline" className="w-fit">
+                                Test Results
+                            </Badge>
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                                {data.testName}
+                            </h1>
+                            <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
+                                {data.description}
+                            </p>
+                        </div>
                     </div>
-                    <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
-                        {data.testName}
-                    </h1>
-                    <p className="text-mountain-meadow-600 text-base max-w-2xl leading-relaxed font-medium">
-                        {data.description}
-                    </p>
-
-                    {/* Abstract Background Glow */}
-                    <div className="absolute -top-24 -left-24 w-96 h-96 bg-mountain-meadow-300/10 rounded-full blur-[120px] -z-10 pointer-events-none" />
                 </header>
 
-                {/* SECTION 1: STATISTICAL OVERVIEW */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-700 dark:text-slate-400">Statistical Metrics</h2>
-                        <div className="h-px flex-1 mx-6 bg-border/40" />
+                        <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">Statistical Metrics</h2>
                     </div>
 
                     <div className="grid gap-6 md:grid-cols-2">
                         <AdvancedStatCard
-                            label="Total Enrolled"
+                            label="Total Participants"
                             value={data.stats.totalParticipants}
                             icon={<Users className="h-5 w-5" />}
-                            color="bg-mountain-meadow-100"
-                            textColor="text-mountain-meadow-600"
-                            trend="Live Data"
+                            description="Completed submissions"
                         />
                         <AdvancedStatCard
                             label="Mean Score"
                             value={data.stats.averageScore.toFixed(1)}
                             icon={<Award className="h-5 w-5" />}
-                            color="bg-blue-100"
-                            textColor="text-blue-600"
-                            trend="Class Average"
+                            description="Average across participants"
                         />
                     </div>
                 </section>
 
-                {/* SECTION 2: STUDENT DETAILS */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-slate-700 dark:text-slate-400">Student Submissions</h2>
-                            <Badge variant="outline" className="rounded-full px-3 py-0 border-mountain-meadow-200 text-mountain-meadow-600 bg-mountain-meadow-50/50">
+                            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">Student Submissions</h2>
+                            <Badge variant="secondary" className="rounded-full px-3 py-0">
                                 {data.participants.length} total
                             </Badge>
                         </div>
-                        <div className="h-px flex-1 ml-6 bg-border/40" />
                     </div>
 
-                    <div className="group relative">
-                        {/* Table Glow Effect */}
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-mountain-meadow-400 to-blue-500 rounded-2xl opacity-0 group-hover:opacity-10 transition duration-1000 group-hover:duration-200 blur" />
-
-                        <div className="relative rounded-2xl border bg-card/60 backdrop-blur-sm overflow-hidden shadow-2xl shadow-mountain-meadow-900/5">
-                            <Table>
-                                <TableHeader className="bg-muted/30">
-                                    <TableRow className="hover:bg-transparent border-b border-border/50">
-                                        <TableHead className="py-5 px-6 font-bold text-foreground">Candidate</TableHead>
-                                        <TableHead className="font-bold text-foreground">Score Index</TableHead>
-                                        <TableHead className="font-bold text-foreground">Submission Date</TableHead>
-                                        <TableHead className="text-right px-6 font-bold text-foreground">Detail View</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
+                    <Card className="overflow-hidden border-border bg-card shadow-sm">
+                        <Table>
+                            <TableHeader className="bg-muted/30">
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead className="py-5 px-6 font-semibold text-foreground">Candidate</TableHead>
+                                    <TableHead className="font-semibold text-foreground">Score</TableHead>
+                                    <TableHead className="font-semibold text-foreground">Submitted</TableHead>
+                                    <TableHead className="text-right px-6 font-semibold text-foreground">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
                                     {data.participants.length > 0 ? (
                                         data.participants.map((p, idx) => (
                                             <TableRow
                                                 key={`${p.userId}-${idx}`}
-                                                className="group/row transition-colors hover:bg-mountain-meadow-50/30 border-b border-border/40 last:border-none"
+                                                className="border-border/60 hover:bg-muted/20"
                                             >
                                                 <TableCell className="py-4 px-6">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-mountain-meadow-100 to-mountain-meadow-200 flex items-center justify-center font-bold text-mountain-meadow-700 shadow-sm border border-white/50">
-                                                            {p.name.charAt(0)}
+                                                        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted/40 font-semibold text-foreground">
+                                                            {p.name.charAt(0).toUpperCase()}
                                                         </div>
-                                                        <div>
-                                                            <div className="font-bold text-foreground text-base group-hover/row:text-mountain-meadow-700 transition-colors">{p.name}</div>
+                                                        <div className="min-w-0">
+                                                            <div className="truncate font-semibold text-foreground">{p.name}</div>
+                                                            <div className="truncate text-sm text-muted-foreground">{p.email}</div>
                                                         </div>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-mono text-lg font-bold">{p.score}</span>
-                                                        <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-mountain-meadow-500 rounded-full transition-all duration-1000"
-                                                                style={{ width: `${(p.score / 100) * 100}%` }}
-                                                            />
-                                                        </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-mono text-base font-semibold text-foreground">{p.score}</span>
+                                                        <Badge variant="secondary" className="font-mono text-[11px]">
+                                                            Score
+                                                        </Badge>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-muted-foreground font-medium text-sm">
-                                                    {new Date(p.submittedAt).toLocaleDateString("en-GB", {
-                                                        day: "2-digit",
-                                                        month: "short",
-                                                        year: "numeric"
-                                                    })}
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {formatSubmittedAt(p.submittedAt)}
                                                 </TableCell>
-                                                <TableCell className="text-right px-6">
+                                                <TableCell className="px-6">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-9 w-9 rounded-full hover:bg-mountain-meadow-100 hover:text-mountain-meadow-700 transition-all border border-transparent hover:border-mountain-meadow-200/50"
-                                                            asChild
-                                                        >
-                                                            <Link href={`/admin/users/${p.userId}`}>
-                                                                <User className="h-4 w-4" />
-                                                            </Link>
-                                                        </Button>
-                                                        <Button
                                                             size="sm"
-                                                            className="bg-mountain-meadow-400 hover:bg-mountain-meadow-500 text-white font-bold rounded-lg px-4 gap-2 shadow-lg shadow-mountain-meadow-200 transition-all active:scale-95"
                                                             asChild
                                                         >
                                                             <Link href={`/admin/tests/${data.id}/submissions/${p.userId}`}>
@@ -238,52 +222,41 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
                                             </TableRow>
                                         ))
                                     ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="py-20 text-center text-muted-foreground font-medium">
-                                                No submissions recorded for this test yet.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="py-20 text-center text-muted-foreground font-medium">
+                                            No submissions recorded for this test yet.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </Card>
                 </section>
             </div>
         </div>
     );
 }
 
-/* ---------- Advanced Helper Components ---------- */
-
 interface StatCardProps {
     label: string;
     value: string | number;
     icon: React.ReactElement;
-    color: string;
-    textColor: string;
-    trend: string;
+    description: string;
 }
 
-function AdvancedStatCard({ label, value, icon, color, textColor, trend }: StatCardProps) {
+function AdvancedStatCard({ label, value, icon, description }: StatCardProps) {
     return (
-        <Card className="relative overflow-hidden group border-none shadow-xl shadow-mountain-meadow-900/5 bg-white/40 dark:bg-zinc-900/40 backdrop-blur-xl">
-            <div className={`absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity ${textColor}`}>
-                {React.cloneElement(icon as React.ReactElement<{ size: number }>, { size: 64 })}
-            </div>
-            <CardHeader className="pb-2 space-y-0">
-                <div className={`w-10 h-10 rounded-xl ${color} ${textColor} flex items-center justify-center mb-4 shadow-inner`}>
+        <Card className="border-border bg-card shadow-sm">
+            <CardHeader className="space-y-3 pb-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-muted/30 text-primary">
                     {icon}
                 </div>
-                <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">{label}</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-                <div className="text-4xl font-black font-mono tracking-tighter text-foreground decoration-mountain-meadow-400 decoration-2">{value}</div>
-                <p className="text-[10px] font-bold text-mountain-meadow-600/80 tracking-wide uppercase">{trend}</p>
+                <div className="font-mono text-4xl font-bold tracking-tight text-foreground">{value}</div>
+                <p className="text-sm text-muted-foreground">{description}</p>
             </CardContent>
-
-            {/* Decorative Bottom Line */}
-            <div className="absolute bottom-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-mountain-meadow-400 to-transparent opacity-30" />
         </Card>
     );
 }
