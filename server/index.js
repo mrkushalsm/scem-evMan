@@ -4,6 +4,9 @@ const cors = require("cors");
 
 const app = express();
 
+// Trust proxy for express-rate-limit (essential in production behind LB/proxy)
+app.set("trust proxy", 1);
+
 const { connectDB } = require("./helpers/dbCon");
 
 // const compRoutes = require("./routes/compilerRoutes");
@@ -13,16 +16,13 @@ const authRoutes = require("./routes/authRoutes");
 
 const port = process.env.PORT || 8080;
 
-// Connect to Database
-connectDB();
-
 // Initialize Cron Jobs (Removed: using lazy/computed status)
 // const initCron = require("./services/cron");
 // initCron();
 
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: (origin, callback) => callback(null, true),
     credentials: true,
   })
 );
@@ -30,7 +30,9 @@ app.use(
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("SOSCEvMan API is running...");
+  res.json({
+    message: "Pomelo API online"
+  });
 });
 
 // Routes
@@ -44,9 +46,12 @@ app.use("/api/test", contestRoutes);
 const submitRoutes = require("./routes/submitRoutes");
 app.use("/api/submit", submitRoutes);
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+(async () => {
+  await connectDB();
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+})();
 
 // Global error handler — must be last
 app.use((err, req, res, next) => {

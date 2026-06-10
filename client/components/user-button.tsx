@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import {
     DropdownMenu,
@@ -42,12 +43,17 @@ export function UserButton() {
                     <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">{user.name}</p>
                         <p className="text-xs leading-none text-muted-foreground">
-                            {user.email}
+                            @{user.username}
                         </p>
                     </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()}>
+                {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                        <Link href="/admin">Admin page</Link>
+                    </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/auth/login" })}>
                     Log out
                 </DropdownMenuItem>
             </DropdownMenuContent>

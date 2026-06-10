@@ -7,31 +7,56 @@ import { Button } from "@/components/ui/button";
 import { LeaderboardTable } from "@/components/admin/test/leaderboard-table";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getBaseUrl } from "@/lib/env";
+
+export const dynamic = "force-dynamic";
 
 interface LeaderboardPageProps {
   params: Promise<{ id: string }>;
 }
 
-async function getLeaderboardData(id: string) {
+interface LeaderboardData {
+  contestId: string;
+  title: string;
+  endTime: string;
+  totalParticipants: number;
+  maxScore: number;
+  leaderboard: {
+    rank: number;
+    name: string;
+    totalScore: number;
+    submittedAt: string | null;
+    status: string;
+  }[];
+}
+
+type LeaderboardResult = 
+  | { success: false; status: number; data?: never }
+  | { success: true; status: number; data: LeaderboardData };
+
+async function getLeaderboardData(id: string): Promise<LeaderboardResult> {
   const session = await auth();
   const token = session?.backendToken;
 
   if (!token) return { success: false, status: 401 };
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/test/${id}/leaderboard`, {
+    const res = await fetch(`${getBaseUrl()}/api/test/${id}/leaderboard`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
 
-    if (res.status === 403) return { success: false, status: 403 };
-    if (res.status === 404) return { success: false, status: 404 };
+    if (res.status === 403) return { success: false as const, status: 403 };
+    if (res.status === 404) return { success: false as const, status: 404 };
 
-    const data = await res.json();
-    return { ...data, status: res.status };
+    const json = await res.json();
+    if (json.success) {
+      return { success: true as const, status: res.status, data: json.data as LeaderboardData };
+    }
+    return { success: false as const, status: res.status };
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
-    return { success: false, status: 500 };
+    return { success: false as const, status: 500 };
   }
 }
 
@@ -42,8 +67,6 @@ export default async function AdminLeaderboardPage({ params }: LeaderboardPagePr
   if (result.status === 404) return notFound();
 
   const isAccessDenied = result.status === 403;
-  const success = result.success;
-  const contestData = result.data;
 
   return (
     <div className="flex-1 overflow-auto bg-background h-full">
@@ -57,7 +80,7 @@ export default async function AdminLeaderboardPage({ params }: LeaderboardPagePr
             </Button>
             <div className="space-y-2">
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                {success ? contestData.title : "Leaderboard"}
+                {result.success ? result.data.title : "Leaderboard"}
               </h1>
               <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
                 Performance rankings and official scores for this test.
@@ -88,7 +111,7 @@ export default async function AdminLeaderboardPage({ params }: LeaderboardPagePr
               </div>
             </CardContent>
           </Card>
-        ) : success ? (
+        ) : result.success ? (
           <div className="space-y-6 sm:space-y-8">
             <section className="space-y-4 sm:space-y-6">
               <div className="flex items-center justify-between">
@@ -97,13 +120,13 @@ export default async function AdminLeaderboardPage({ params }: LeaderboardPagePr
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <AdvancedStatCard
                   label="Participated Students"
-                  value={contestData.totalParticipants}
+                  value={result.data.totalParticipants}
                   icon={<User className="h-5 w-5" />}
                   description="Total recorded attempts"
                 />
                 <AdvancedStatCard
                   label="Highest Score"
-                  value={contestData.leaderboard.length > 0 ? contestData.leaderboard[0].totalScore : 0}
+                  value={`${result.data.leaderboard.length > 0 ? result.data.leaderboard[0].totalScore : 0} / ${result.data.maxScore || 0}`}
                   icon={<Award className="h-5 w-5" />}
                   description="Top performer index"
                 />
@@ -115,11 +138,11 @@ export default async function AdminLeaderboardPage({ params }: LeaderboardPagePr
                 <div className="flex items-center gap-3">
                   <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">Final Standings</h2>
                   <Badge variant="secondary" className="rounded-full px-3 py-0">
-                    {contestData.leaderboard.length} ranked
+                    {result.data.leaderboard.length} ranked
                   </Badge>
                 </div>
               </div>
-              <LeaderboardTable data={contestData.leaderboard} />
+              <LeaderboardTable data={result.data.leaderboard} maxScore={result.data.maxScore || 0} />
             </section>
           </div>
         ) : (

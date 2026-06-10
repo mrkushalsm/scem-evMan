@@ -3,14 +3,7 @@ import TestForm from "@/components/admin/test/test-form";
 import { db } from "@/lib/db";
 import { Problem } from "@/types/problem";
 
-function formatTimeForDisplay(date: Date) {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? "PM" : "AM";
-  const normalizedHours = hours % 12 || 12;
-
-  return `${String(normalizedHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`;
-}
+export const dynamic = "force-dynamic";
 
 interface IdParams {
   id: string;
@@ -69,14 +62,12 @@ export default async function AdminTestEditPage({
 
   let testData = null;
   if (testDataRaw) {
-    const end = new Date(testDataRaw.endTime);
-    const endTimeStr = formatTimeForDisplay(end);
-
     testData = {
       ...testDataRaw,
       id: testDataRaw._id,
       startsAt: testDataRaw.startTime ? new Date(testDataRaw.startTime).toISOString() : '',
-      duration: endTimeStr,
+      endsAt: testDataRaw.endTime ? new Date(testDataRaw.endTime).toISOString() : '',
+      duration: '',
       problems: (testDataRaw.questions || []).map((q) => typeof q === 'string' ? q : (q._id || q.id || String(q))),
       rules: testDataRaw.rules || [],
       status: (testDataRaw.status || "waiting") as "waiting" | "ongoing" | "completed",

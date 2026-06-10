@@ -12,15 +12,47 @@ import { CodingProblem } from "@/types/problem";
 
 export function CodeScreen({ problem }: { problem: CodingProblem }) {
   const availableLanguages = Object.keys(problem.boilerplateCode || {}) as Array<keyof typeof problem.boilerplateCode>;
-  const initialCode = problem.savedCode
-    || (problem.boilerplateCode && availableLanguages.length > 0 ? (problem.boilerplateCode[availableLanguages[0]] || "") : "// Start coding here");
-  const [code, setCode] = useState(initialCode);
-  const [language, setLanguage] = useState(availableLanguages.length > 0 ? String(availableLanguages[0]) : "javascript");
+  
+  const initialLanguage = problem.savedLanguage || (availableLanguages.length > 0 ? String(availableLanguages[0]) : "javascript");
+  const [language, setLanguage] = useState(initialLanguage);
+  
+  const [code, setCode] = useState(problem.savedCode || (problem.boilerplateCode && availableLanguages.length > 0 ? (problem.boilerplateCode[initialLanguage as keyof typeof problem.boilerplateCode] || "") : "// Start coding here"));
   const [isMounted, setIsMounted] = useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
-  }, []);
+    // If we do not have a saved code from the server for the current initial language, check local storage
+    if (!problem.savedCode) {
+       const draft = localStorage.getItem(`pomelo_draft_${problem.id}_${initialLanguage}`);
+       if (draft) {
+          setCode(draft);
+       }
+    }
+  }, [problem.id, initialLanguage, problem.savedCode]);
+
+  React.useEffect(() => {
+    if (isMounted && code !== "") {
+      localStorage.setItem(`pomelo_draft_${problem.id}_${language}`, code);
+    }
+  }, [code, language, problem.id, isMounted]);
+
+  const handleLanguageChange = (newLang: string) => {
+    setLanguage(newLang);
+    
+    // Prioritize server-saved code if this is the language they originally submitted in
+    if (problem.savedLanguage === newLang && problem.savedCode) {
+      setCode(problem.savedCode);
+      return;
+    }
+
+    // Try loading from local storage
+    const draft = localStorage.getItem(`pomelo_draft_${problem.id}_${newLang}`);
+    if (draft) {
+      setCode(draft);
+    } else {
+      setCode(problem.boilerplateCode ? (problem.boilerplateCode[newLang as keyof typeof problem.boilerplateCode] || "") : "// Start coding here");
+    }
+  };
 
   if (!isMounted) return null;
 
@@ -44,7 +76,7 @@ export function CodeScreen({ problem }: { problem: CodingProblem }) {
                 code={code}
                 setCode={setCode}
                 language={language}
-                setLanguage={setLanguage}
+                setLanguage={handleLanguageChange}
               />
             </div>
           </ResizablePanel>

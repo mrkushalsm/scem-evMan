@@ -4,13 +4,13 @@ const User = require('../models/User');
 const handleLogin = async (req, res, next) => {
     try {
         const { SignJWT } = await import('jose');
-        const { email, password } = req.body;
+        const { username, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required' });
         }
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ username });
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -24,7 +24,7 @@ const handleLogin = async (req, res, next) => {
         const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
         const token = await new SignJWT({
             userId: user._id.toString(),
-            email: user.email,
+            username: user.username,
             role: user.role
         })
             .setProtectedHeader({ alg: 'HS256' })
@@ -37,7 +37,7 @@ const handleLogin = async (req, res, next) => {
             token,
             user: {
                 _id: user._id,
-                email: user.email,
+                username: user.username,
                 name: user.name,
                 role: user.role
             }
@@ -51,22 +51,24 @@ const handleLogin = async (req, res, next) => {
 const handleRegister = async (req, res, next) => {
     try {
         const { SignJWT } = await import('jose');
-        const { name, email, password } = req.body;
+        const { username, password } = req.body;
 
-        if (!name || !email || !password) {
+        if (!username || !password) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({ username });
         if (existingUser) {
-            return res.status(409).json({ message: 'User already exists' });
+            return res.status(409).json({ message: 'Username is already taken' });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
 
+        const derivedName = username.charAt(0).toUpperCase() + username.slice(1);
+
         const newUser = new User({
-            name,
-            email,
+            name: derivedName,
+            username,
             passwordHash,
             role: 'user',
             registeredContests: []
@@ -78,7 +80,7 @@ const handleRegister = async (req, res, next) => {
         const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
         const token = await new SignJWT({
             userId: newUser._id.toString(),
-            email: newUser.email,
+            username: newUser.username,
             role: newUser.role
         })
             .setProtectedHeader({ alg: 'HS256' })
@@ -92,7 +94,7 @@ const handleRegister = async (req, res, next) => {
             token,
             user: {
                 _id: newUser._id,
-                email: newUser.email,
+                username: newUser.username,
                 name: newUser.name,
                 role: newUser.role
             }

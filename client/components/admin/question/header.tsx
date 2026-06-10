@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,

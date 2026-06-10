@@ -31,8 +31,8 @@ const features = [
       icon: <LayoutDashboard className="text-muted-foreground mb-2" size={32} />,
     },
     {
-      title: "No Signups Needed",
-      description: "Participants can join instantly—no account required.",
+      title: "Easy Signups",
+      description: "Get participants onboarded instantly with a seamless registration process.",
       icon: <UserPlus className="text-muted-foreground mb-2" size={32} />,
     },
   ],
@@ -60,7 +60,7 @@ export default function FeaturesSection() {
               {column.map((feature) => (
                 <Card key={feature.title} className="flex-1 h-full flex flex-col bg-background">
                   <CardContent className="flex flex-row items-start gap-4 p-6 h-full">
-                    <div className="flex-shrink-0">{feature.icon}</div>
+                    <div className="shrink-0">{feature.icon}</div>
                     <div className="text-left">
                       <h3 className="font-bold text-lg text-foreground mb-1">
                         {feature.title}

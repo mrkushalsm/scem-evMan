@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { format } from "date-fns";
+import { LocalTime } from "@/components/ui/local-time";
 import {
     ArrowLeft,
     CheckCircle2,
@@ -36,6 +36,7 @@ interface PopulatedUser {
 interface ContestRecord {
     _id: string;
     title?: string;
+    questions?: { marks?: number }[];
 }
 
 interface PopulatedQuestion {
@@ -123,7 +124,7 @@ function mapSubmissionDetail(submissionItem: RawSubmissionItem): SubmissionDetai
 
     if (isMCQQuestion(question)) {
         const options = (question.options || []).map((option, index) => ({
-            id: String.fromCharCode(97 + index),
+            id: String(index),
             text: option,
         }));
 
@@ -167,14 +168,6 @@ function mapSubmissionDetail(submissionItem: RawSubmissionItem): SubmissionDetai
     };
 }
 
-function formatSubmittedAt(value: string) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return "Unknown";
-    }
-
-    return format(date, "MMM d, yyyy, h:mm a");
-}
 
 function getSubmissionStatusVariant(status: SubmissionStatus): "default" | "destructive" | "secondary" {
     if (status === "PASSED" || status === "Accepted") {
@@ -216,7 +209,8 @@ export default async function SubmissionDetailPage({
         notFound();
     }
 
-    const contest = await db.findOne<ContestRecord>("contests", { _id: contestId });
+    const contest = await db.findOne<ContestRecord>("contests", { _id: contestId }, { populate: ["questions"] });
+    const maxScore = (contest?.questions || []).reduce((sum: number, q: { marks?: number }) => sum + (q.marks || 0), 0);
 
     const details = (submissionData.submissions || [])
         .map(mapSubmissionDetail)
@@ -228,7 +222,7 @@ export default async function SubmissionDetailPage({
         testId: contestId,
         testName: contest?.title || "Unknown Test",
         totalScore: submissionData.totalScore || 0,
-        maxScore: details.reduce((sum, detail) => sum + detail.points, 0),
+        maxScore,
         submittedAt: submissionData.submittedAt || submissionData.createdAt || "",
         details,
     };
@@ -260,7 +254,7 @@ export default async function SubmissionDetailPage({
                 <div className="grid gap-6 md:grid-cols-3">
                     <StatItem icon={<Trophy className="h-4 w-4" />} label="Candidate" value={data.userName} mono={false} />
                     <StatItem icon={<Trophy className="h-4 w-4" />} label="Total Score" value={`${data.totalScore} / ${data.maxScore}`} />
-                    <StatItem icon={<Clock className="h-4 w-4" />} label="Submitted On" value={formatSubmittedAt(data.submittedAt)} mono={false} />
+                    <StatItem icon={<Clock className="h-4 w-4" />} label="Submitted On" value={<LocalTime iso={data.submittedAt} />} mono={false} />
                 </div>
 
                 <div className="space-y-8">
@@ -366,7 +360,7 @@ export default async function SubmissionDetailPage({
                                                                     )}
                                                                 </summary>
 
-                                                                {!tc.isHidden && (tc.input || tc.expectedOutput || tc.error) && (
+                                                                {(tc.input || tc.expectedOutput || tc.error) && (
                                                                     <div className="space-y-3 border-t border-border/60 bg-background px-4 pb-4 pt-3">
                                                                         {tc.input && (
                                                                             <div className="space-y-1">
@@ -392,7 +386,7 @@ export default async function SubmissionDetailPage({
                                                                                 </pre>
                                                                             </div>
                                                                         )}
-                                                                        {tc.error && (
+                                                                        {tc.error && !tc.passed && (
                                                                             <div className="space-y-1">
                                                                                 <div className="text-[10px] font-bold uppercase tracking-wider text-destructive">Error Logs</div>
                                                                                 <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-destructive/20 bg-destructive/10 p-2 font-mono text-[11px] text-destructive">
@@ -419,7 +413,7 @@ export default async function SubmissionDetailPage({
     );
 }
 
-function StatItem({ icon, label, value, mono = true }: { icon: React.ReactNode; label: string; value: string; mono?: boolean }) {
+function StatItem({ icon, label, value, mono = true }: { icon: React.ReactNode; label: string; value: React.ReactNode; mono?: boolean }) {
     return (
         <Card className="h-full border-border bg-card shadow-sm">
             <CardContent className="flex min-h-24 h-full items-center gap-3 px-5 py-">

@@ -11,37 +11,36 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Trash2, Copy, Loader2 } from "lucide-react";
+import { Clock, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Test } from "@/types/test";
-import { cloneTestAction } from "@/app/actions/clone-test";
-import { format } from "date-fns";
+import { getTestStatusBadgeVariant, getTestStatusLabel } from "@/lib/test-status";
+
+import { deleteTestAction } from "@/actions/delete-test";
 
 export function TestCard({ test }: { test: Test }) {
   const router = useRouter();
-  const [isCloning, setIsCloning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const statusLabel = getTestStatusLabel(test.status);
+  const statusVariant = getTestStatusBadgeVariant(test.status);
 
   return (
     <Card className="shadow-md bg-card border-border">
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg sm:text-xl text-foreground font-semibold truncate">
-              {test.title}
+            <CardTitle className="text-lg sm:text-xl text-foreground font-semibold truncate block w-full" title={test.title}>
+              {test.title.length > 35 ? test.title.substring(0, 35) + "..." : test.title}
             </CardTitle>
-            <CardDescription className="text-muted-foreground mt-1 text-sm leading-relaxed line-clamp-2">
-              {test.description}
+            <CardDescription className="text-muted-foreground mt-2 text-sm leading-relaxed break-words line-clamp-2 h-[44px]" title={test.description}>
+              {test.description.length > 100 ? test.description.substring(0, 100) + "..." : test.description}
             </CardDescription>
           </div>
           <Badge
-            className={`px-3 py-1 text-xs font-medium rounded-full border shrink-0`}
+            variant={statusVariant}
+            className="px-3 py-1 text-xs font-medium rounded-full border shrink-0"
           >
-            {test.status === "completed"
-              ? "Completed"
-              : test.status === "ongoing"
-                ? "Active"
-                : "Waiting"}
+            {statusLabel}
           </Badge>
         </div>
       </CardHeader>
@@ -52,7 +51,7 @@ export function TestCard({ test }: { test: Test }) {
           <Clock className="h-4 w-4 text-foreground shrink-0" />
           <span className="font-medium">Starts:</span>
           <span className="truncate">
-            {format(new Date(test.startsAt), "MMM d, yyyy, h:mm a")}
+            {new Date(test.startsAt).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
           </span>
         </div>
 
@@ -135,8 +134,8 @@ export function TestCard({ test }: { test: Test }) {
                 </Button>
               </Link>
             ) : (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full text-sm opacity-50 cursor-not-allowed border-border"
                 title="Leaderboard is available after the test ends"
               >
@@ -144,30 +143,6 @@ export function TestCard({ test }: { test: Test }) {
               </Button>
             )}
           </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
-            disabled={isCloning}
-            title="Clone Test"
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (confirm("Are you sure you want to duplicate this test?")) {
-                setIsCloning(true);
-                const res = await cloneTestAction(test.id as string);
-                setIsCloning(false);
-                if (res.success && res.newTestId) {
-                  router.push(`/admin/tests/${res.newTestId}/edit`);
-                } else {
-                  alert(res.message);
-                }
-              }
-            }}
-          >
-            {isCloning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
-          </Button>
 
           <Button
             variant="ghost"
@@ -182,13 +157,10 @@ export function TestCard({ test }: { test: Test }) {
                 setIsDeleting(true);
 
                 try {
-                  const response = await fetch(`/api/admin/tests/${test.id}`, {
-                    method: "DELETE",
-                  });
-                  const json = await response.json();
+                  const json = await deleteTestAction(test.id as string);
 
-                  if (!response.ok || !json.success) {
-                    throw new Error(json.error || "Failed to delete test");
+                  if (!json.success) {
+                    throw new Error(json.message || "Failed to delete test");
                   }
 
                   router.refresh();

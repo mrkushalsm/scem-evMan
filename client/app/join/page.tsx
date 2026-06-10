@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
 import {
@@ -9,6 +9,9 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { toast } from "sonner";
+
+
+import { joinTest } from "@/actions/contest";
 
 export default function JoinContestPage() {
   const router = useRouter();
@@ -20,36 +23,14 @@ export default function JoinContestPage() {
   const isSignedIn = status === "authenticated";
   const allFilled = otp.length === 6;
 
-
-  useEffect(() => {
-    if (session) {
-      console.log("Next-Auth Session Active:", session.user?.email);
-
-      console.log("Backend Token available:", !!session.backendToken);
-    }
-  }, [session]);
-
   const handleJoin = async () => {
     if (!allFilled) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/test/join`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ joinId: otp }),
-        }
-      );
-
-      const result = await response.json();
+      const result = await joinTest(otp);
 
       if (result.success) {
-        toast.success(`Joining: ${result.title}`);
         router.push(`/test/${result.contestId}`);
       } else {
         toast.error(result.message || "Invalid Join ID");

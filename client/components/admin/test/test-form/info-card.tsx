@@ -27,7 +27,7 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function formatTimeForDisplay(hours: number, minutes: number) {
   const period = hours >= 12 ? "PM" : "AM";
@@ -70,9 +70,13 @@ export default function TestBasicCard() {
   const { control, setValue, watch } = useFormContext();
 
   const startsAt = watch("startsAt");
+  const duration = watch("duration");
+  const endsAt = watch("endsAt");
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("12:00 AM");
+  const endsAtInitialized = useRef(false);
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
     if (startsAt) {
@@ -98,6 +102,32 @@ export default function TestBasicCard() {
       setValue("startsAt", updated.toISOString());
     }
   }, [date, time, setValue]);
+
+  // On edit: initialize the "Ends At" display from the stored UTC endsAt
+  useEffect(() => {
+    if (!endsAtInitialized.current && endsAt) {
+      endsAtInitialized.current = true;
+      const parsed = new Date(endsAt);
+      if (!isNaN(parsed.getTime())) {
+        setValue("duration", formatTimeForInput(parsed));
+      }
+    }
+  }, [endsAt, setValue]);
+
+  // Recompute endsAt (UTC ISO) whenever the end time input or start date changes
+  useEffect(() => {
+    if (date && duration) {
+      endsAtInitialized.current = true;
+      const parsedTime = parseTimeInput(duration);
+      if (!parsedTime) return;
+      const endDate = new Date(date);
+      endDate.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
+      if (startsAt && endDate <= new Date(startsAt)) {
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      setValue("endsAt", endDate.toISOString());
+    }
+  }, [date, duration, startsAt, setValue]);
 
   return (
     <Card>
@@ -139,6 +169,9 @@ export default function TestBasicCard() {
           )}
         />
 
+        <p className="text-xs text-muted-foreground">
+          All times are in your local timezone: <span className="font-medium">{userTimezone}</span>
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={control}
@@ -200,10 +233,15 @@ export default function TestBasicCard() {
             </div>
           </div>
         </div>
-        {/* Hidden status field to ensure it is passed */}
+        {/* Hidden fields to ensure computed values are passed */}
         <FormField
           control={control}
           name="status"
+          render={({ field }) => <input type="hidden" {...field} />}
+        />
+        <FormField
+          control={control}
+          name="endsAt"
           render={({ field }) => <input type="hidden" {...field} />}
         />
       </CardContent>

@@ -34,9 +34,6 @@ export default function CodeEditorPanel({
 
   const handleLanguageChange = (val: Language) => {
     setLanguage(val);
-    if (boilerplate[val]) {
-      setCode(boilerplate[val]!);
-    }
   };
 
   return (

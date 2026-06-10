@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,23 @@ import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
+import { submitMcq } from "@/actions/contest";
+
 interface MCQScreenProps {
   problem: MCQProblem;
   problems: Problem[];
 }
+
+const DEBOUNCE_MS = 800;
 
 export default function MCQScreen({ problem, problems }: MCQScreenProps) {
   const [selected, setSelected] = useState<string[]>(problem.savedAnswer || []);
   const router = useRouter();
   const params = useParams();
   const [isSaving, setIsSaving] = useState(false);
-  const { data: session } = useSession();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the latest selection for debounced flush
+  const pendingSelectionRef = useRef<string[] | null>(null);
 
   // Create sorting logic matching TestHeader: MCQs first, then Coding
   const mcqProblems = problems.filter((p) => p.questionType !== "Coding");
@@ -33,37 +39,68 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
   const prevProblem = sortedProblems[currentIndex - 1];
   const nextProblem = sortedProblems[currentIndex + 1];
 
-  const handleSave = async (answers: string[]) => {
-    if (!session?.backendToken || !params.testid) return;
+  const doSave = useCallback(async (answers: string[]) => {
+    if (!params.testid) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/test/${params.testid}/mcq`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.backendToken}`
-        },
-        body: JSON.stringify({
-          contestId: params.testid,
-          questionId: problem._id || problem.id,
-          answer: answers
-        })
-      });
-      const data = await res.json();
+      const data = await submitMcq(params.testid as string, String(problem._id || problem.id), answers);
       if (!data.success) {
-        toast.error(data.error || "Failed to save answer");
+        if (data.rateLimited) {
+          toast.error(data.error || "Rate limited — please slow down");
+        } else {
+          toast.error(data.error || "Failed to save answer");
+        }
       }
     } catch {
       toast.error("Network error saving answer");
     } finally {
       setIsSaving(false);
+      pendingSelectionRef.current = null;
     }
-  };
+  }, [params.testid, problem._id, problem.id]);
+
+  const flushPending = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (pendingSelectionRef.current !== null) {
+      doSave(pendingSelectionRef.current);
+    }
+  }, [doSave]);
+
+  const scheduleSave = useCallback((answers: string[]) => {
+    pendingSelectionRef.current = answers;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      doSave(answers);
+    }, DEBOUNCE_MS);
+  }, [doSave]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  const isMultiple = problem.questionType === "Multiple Correct";
 
   const handleSingleSelect = (value: string) => {
     const newSelection = [value];
     setSelected(newSelection);
-    handleSave(newSelection);
+    // Single correct: submit immediately (no debounce needed — one click)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    pendingSelectionRef.current = null;
+    doSave(newSelection);
   };
 
   const handleMultipleSelect = (value: string) => {
@@ -71,26 +108,23 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
       ? selected.filter((v: string) => v !== value)
       : [...selected, value];
     setSelected(newSelection);
-    handleSave(newSelection);
+    // Multiple correct: debounce so rapid clicks batch together
+    scheduleSave(newSelection);
   };
 
   const handlePrev = () => {
+    flushPending();
     if (prevProblem) {
       router.push(`/attempt/test/${params.testid}/question/${prevProblem.id}`);
     }
   };
 
   const handleNext = () => {
+    flushPending();
     if (nextProblem) {
       router.push(`/attempt/test/${params.testid}/question/${nextProblem.id}`);
-    } else {
-      // If "Finish", we can trigger the global submit if desired, 
-      // but usually the Submit button in Header handles final endTest.
-      toast.success("All questions completed! Click Submit to finish the test.");
     }
   };
-
-  const isMultiple = problem.questionType === "Multiple Correct";
 
   return (
     <div className="h-full bg-background p-4 flex justify-center items-center overflow-hidden">
@@ -219,6 +253,7 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
           <Button
             className="px-6 font-medium"
             onClick={handleNext}
+            disabled={!nextProblem}
           >
             {nextProblem ? "Next" : "Finish"}
           </Button>

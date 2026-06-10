@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { format } from "date-fns";
 import {
   Table,
   TableBody,
@@ -22,14 +21,15 @@ interface LeaderboardEntry {
 
 interface LeaderboardTableProps {
   data: LeaderboardEntry[];
+  maxScore: number;
 }
 
-export function LeaderboardTable({ data }: LeaderboardTableProps) {
+export function LeaderboardTable({ data, maxScore }: LeaderboardTableProps) {
   const formatSubmittedAt = (value: string | null) => {
     if (!value) return "N/A";
     const date = new Date(value);
     if (isNaN(date.getTime())) return "N/A";
-    return format(date, "MMM d, yyyy, h:mm a");
+    return date.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
   };
 
   return (
@@ -61,7 +61,7 @@ export function LeaderboardTable({ data }: LeaderboardTableProps) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-base font-bold text-foreground">{entry.totalScore}</span>
+                    <span className="font-mono text-base font-bold text-foreground">{entry.totalScore} / {maxScore}</span>
                     <Badge variant="secondary" className="font-mono text-[11px] font-normal">
                       Marks
                     </Badge>

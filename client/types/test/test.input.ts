@@ -17,6 +17,7 @@ export const testSchema = z.object({
       "End time must be in HH:MM AM/PM format",
     ),
   startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime(),
   problems: z.array(z.string()),
   rules: z.array(z.string()).default([]),
 });

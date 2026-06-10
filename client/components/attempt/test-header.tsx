@@ -2,10 +2,13 @@
 
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { BadgeCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { BadgeCheck, ChevronLeft, ChevronRight, ShieldAlert } from "lucide-react";
 import { useRouter, usePathname, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useTestCompletion } from "./use-test-completion";
+import { getBaseUrl } from "@/lib/env";
+import { getContestData } from "@/actions/contest";
+import { readViolationCount, MAX_VIOLATIONS } from "@/lib/attempt-integrity";
 
 type ProblemMeta = {
   id: string;
@@ -23,6 +26,21 @@ export default function TestHeader({ problems }: TestHeaderProps) {
   const params = useParams();
   const { data: session } = useSession();
   const { completeTest, isSubmitting } = useTestCompletion();
+  const [violations, setViolations] = React.useState(0);
+
+  // Sync with cross-tab/local violation updates
+  React.useEffect(() => {
+    if (params.testid) {
+      setViolations(readViolationCount(params.testid as string));
+    }
+
+    const handleViolationUpdate = (e: any) => {
+      setViolations(e.detail.count);
+    };
+
+    window.addEventListener("pomelo-violation-update", handleViolationUpdate);
+    return () => window.removeEventListener("pomelo-violation-update", handleViolationUpdate);
+  }, [params.testid]);
 
   // Handle BFCache (Back/Forward Cache)
   // If user presses back button after finishing, force a refresh to trigger server-side checks
@@ -39,18 +57,11 @@ export default function TestHeader({ problems }: TestHeaderProps) {
   // Client-side verification on mount to handle back navigation / stale cache
   React.useEffect(() => {
     const verifyStatus = async () => {
-      if (!session?.backendToken || !params.testid) return;
+      if (!params.testid) return;
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/test/${params.testid}/data`, {
-          headers: {
-            "Authorization": `Bearer ${session.backendToken}`,
-            "Content-Type": "application/json"
-          },
-          cache: "no-store"
-        });
-        const data = await res.json();
+        const data = await getContestData(params.testid as string);
         // If server says completed or prohibited, kick them out
-        if (!res.ok || (data.isCompleted)) {
+        if (!data.success || (data.data?.isCompleted)) {
           router.replace(`/test/${params.testid}`);
         }
       } catch {
@@ -58,7 +69,7 @@ export default function TestHeader({ problems }: TestHeaderProps) {
       }
     };
     verifyStatus();
-  }, [session, params.testid, router]);
+  }, [params.testid, router]);
 
   const handleFinish = async () => {
     if (!session?.backendToken || !params.testid) return;
@@ -82,6 +93,16 @@ export default function TestHeader({ problems }: TestHeaderProps) {
 
   return (
     <div className="flex items-center justify-center p-2 select-none h-12 absolute top-0 w-screen bg-primary">
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center shrink-0">
+        <div 
+          className="flex items-center gap-1.5 px-3 h-8 bg-primary-foreground/10 text-primary-foreground/90 border border-primary-foreground/20 rounded-full text-xs font-medium hover:bg-primary-foreground/20 transition-colors"
+          title={`${MAX_VIOLATIONS - violations} warnings left`}
+        >
+          <ShieldAlert className="h-3.5 w-3.5 text-primary-foreground/70" />
+          <span>{MAX_VIOLATIONS - violations}</span>
+        </div>
+      </div>
+
       <Button
         variant="secondary"
         size="icon"
@@ -91,7 +112,7 @@ export default function TestHeader({ problems }: TestHeaderProps) {
         <ChevronLeft className="h-4 w-4" />
       </Button>
 
-      <div ref={scrollRef} className="overflow-x-auto no-scrollbar">
+      <div ref={scrollRef} className="overflow-x-auto no-scrollbar max-w-[50vw] sm:max-w-[60vw] lg:max-w-[800px]">
         <div className="flex w-max bg-background h-9">
           {mcqProblems.length > 0 && (
             <div className="flex items-center rounded-md px-2 py-1">
@@ -157,15 +178,17 @@ export default function TestHeader({ problems }: TestHeaderProps) {
         <ChevronRight className="h-4 w-4" />
       </Button>
 
-      <Button
-        variant={"secondary"}
-        className="text-sm mx-4 bg-green-600 hover:bg-green-700 text-white border-none"
-        onClick={handleFinish}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? "Finishing..." : "Submit"}
-        {!isSubmitting && <BadgeCheck className="h-4 w-4 ml-2" />}
-      </Button>
+      <div className="flex items-center ml-4 mr-2 shrink-0">
+        <Button
+          variant={"secondary"}
+          className="text-sm bg-green-600 hover:bg-green-700 text-white border-none h-9"
+          onClick={handleFinish}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Finishing..." : "Submit"}
+          {!isSubmitting && <BadgeCheck className="h-4 w-4 ml-2" />}
+        </Button>
+      </div>
     </div>
   );
 }

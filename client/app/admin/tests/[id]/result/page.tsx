@@ -19,13 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
+import { LocalTime } from "@/components/ui/local-time";
 
 /* ---------- Types ---------- */
 interface Participant {
     userId: string;
     name: string;
-    email: string;
+    username: string;
     score: number;
     submittedAt: string;
 }
@@ -38,6 +38,7 @@ interface TestResult {
     stats: {
         totalParticipants: number;
         averageScore: number;
+        maxScore: number;
     };
 }
 
@@ -45,12 +46,13 @@ interface MongoContest {
     _id: string;
     title: string;
     description: string;
+    questions?: { marks?: number }[];
 }
 
 interface MongoUser {
     _id: string;
     name: string;
-    email: string;
+    username: string;
 }
 
 interface MongoSubmission {
@@ -59,20 +61,12 @@ interface MongoSubmission {
     submittedAt: string;
 }
 
-function formatSubmittedAt(value: string) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return "Unknown";
-    }
-
-    return format(date, "MMM d, yyyy, h:mm a");
-}
 
 export default async function AdminTestResultPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
     // Fetch contest details
-    const contest = await db.findOne<MongoContest>('contests', { _id: id });
+    const contest = await db.findOne<MongoContest>('contests', { _id: id }, { populate: 'questions' });
     if (!contest) {
         return notFound();
     }
@@ -90,7 +84,7 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
         .map(sub => ({
             userId: sub.user?._id || 'unknown',
             name: sub.user?.name || 'Unknown User',
-            email: sub.user?.email || 'N/A',
+            username: sub.user?.username || 'N/A',
             score: sub.totalScore || 0,
             submittedAt: sub.submittedAt
         }));
@@ -100,6 +94,7 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
     const averageScore = totalParticipants > 0
         ? participants.reduce((acc, p) => acc + p.score, 0) / totalParticipants
         : 0;
+    const maxScore = (contest.questions || []).reduce((sum: number, q: { marks?: number }) => sum + (q.marks || 0), 0);
 
     const data: TestResult = {
         id: contest._id,
@@ -108,7 +103,8 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
         participants,
         stats: {
             totalParticipants,
-            averageScore
+            averageScore,
+            maxScore
         }
     };
 
@@ -150,7 +146,7 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
                         />
                         <AdvancedStatCard
                             label="Mean Score"
-                            value={data.stats.averageScore.toFixed(1)}
+                            value={`${data.stats.averageScore.toFixed(1)} / ${data.stats.maxScore}`}
                             icon={<Award className="h-5 w-5" />}
                             description="Average across participants"
                         />
@@ -191,20 +187,20 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
                                                         </div>
                                                         <div className="min-w-0">
                                                             <div className="truncate font-semibold text-foreground">{p.name}</div>
-                                                            <div className="truncate text-sm text-muted-foreground">{p.email}</div>
+                                                            <div className="truncate text-sm text-muted-foreground">@{p.username}</div>
                                                         </div>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center gap-3">
-                                                        <span className="font-mono text-base font-semibold text-foreground">{p.score}</span>
+                                                        <span className="font-mono text-base font-semibold text-foreground">{p.score} / {data.stats.maxScore}</span>
                                                         <Badge variant="secondary" className="font-mono text-[11px]">
                                                             Score
                                                         </Badge>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">
-                                                    {formatSubmittedAt(p.submittedAt)}
+                                                    <LocalTime iso={p.submittedAt} />
                                                 </TableCell>
                                                 <TableCell className="px-6">
                                                     <div className="flex items-center justify-end gap-2">

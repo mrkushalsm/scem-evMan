@@ -32,11 +32,8 @@ interface Props {
 export function TestsList({ initialTests }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Map mongo objects if needed or assume they match what TestCard expects
-  // TestCard expects 'Test' type. We might need mapping.
-  // Map mongo objects if needed or assume they match what TestCard expects
-  // TestCard expects 'Test' type. We might need mapping.
-  const tests = initialTests.map(t => {
+  // Map mongo objects to the shape TestCard expects.
+  const tests = [...initialTests].reverse().map(t => {
     const start = t.startTime ? new Date(t.startTime).getTime() : 0;
     const end = t.endTime ? new Date(t.endTime).getTime() : 0;
     const durationMs = end - start;

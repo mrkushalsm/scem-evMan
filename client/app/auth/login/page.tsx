@@ -13,10 +13,10 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
-import { authenticate } from "@/app/actions/auth";
+import { authenticate } from "@/actions/auth";
 
 function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [ssoError, setSsoError] = useState("");
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -36,14 +36,16 @@ function LoginForm() {
   }, [searchParams]);
 
   const validateForm = () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     let valid = true;
 
-    if (!email.trim()) {
-      toast.error("Email is required.");
+    if (!username.trim()) {
+      toast.error("Username is required.");
       valid = false;
-    } else if (!emailRegex.test(email)) {
-      toast.error("Please enter a valid email address");
+    } else if (username.length < 3) {
+      toast.error("Username must be at least 3 characters.");
+      valid = false;
+    } else if (!/^[a-zA-Z0-9_.@]+$/.test(username)) {
+      toast.error("Username can only contain letters, numbers, underscores, periods, and @.");
       valid = false;
     }
 
@@ -66,7 +68,7 @@ function LoginForm() {
 
     try {
       const formData = new FormData();
-      formData.append("email", email);
+      formData.append("username", username);
       formData.append("password", password);
 
       const result = await authenticate(undefined, formData);
@@ -128,10 +130,10 @@ function LoginForm() {
                   <Input
                     className="pl-12 pr-4 py-3 bg-muted text-foreground rounded-md"
                     type="text"
-                    placeholder="E-Mail ID"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    name="email"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    name="username"
                   />
                 </div>
               </div>
@@ -159,6 +161,7 @@ function LoginForm() {
                 </div>
               </div>
 
+              {/*
               <div className="text-right -mt-2">
                 <Link
                   href="/auth/forgot-password"
@@ -167,6 +170,7 @@ function LoginForm() {
                   Forgot Password?
                 </Link>
               </div>
+              */}
 
               <Button
                 type="submit"
@@ -197,6 +201,7 @@ function LoginForm() {
                 </Button>
               </div>
 
+              {/*
               <div className="flex items-center my-6">
                 <hr className="grow border-muted" />
                 <span className="px-4 text-sm text-muted-foreground">OR</span>
@@ -222,6 +227,7 @@ function LoginForm() {
                   </>
                 )}
               </Button>
+              */}
             </form>
 
             <p className="text-xs text-muted-foreground text-center">

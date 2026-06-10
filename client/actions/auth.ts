@@ -1,0 +1,62 @@
+"use server";
+
+import { signIn } from "@/auth";
+import { AuthError } from "next-auth";
+import { z } from "zod";
+import { getBaseUrl } from "@/lib/env";
+
+const RegisterSchema = z.object({
+    username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_.@]+$/, "Only letters, numbers, underscores, periods, and @ allowed"),
+    password: z.string().min(6),
+});
+
+export async function authenticate(prevState: string | undefined, formData: FormData) {
+    try {
+        await signIn("credentials", {
+            username: formData.get("username"),
+            password: formData.get("password"),
+            redirect: false,
+        });
+        return "success";
+    } catch (error) {
+        if (error instanceof AuthError) {
+            switch (error.type) {
+                case "CredentialsSignin":
+                    return "Invalid credentials.";
+                default:
+                    return "Something went wrong.";
+            }
+        }
+        throw error;
+    }
+}
+
+export async function register(prevState: string | undefined, formData: FormData) {
+    const validatedFields = RegisterSchema.safeParse(Object.fromEntries(formData.entries()));
+
+    if (!validatedFields.success) {
+        return "Invalid fields";
+    }
+
+    const { username, password } = validatedFields.data;
+
+    try {
+        const res = await fetch(`${getBaseUrl()}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+            return data.message || "Registration failed";
+        }
+
+        return "success";
+
+    } catch (error) {
+        console.error("Registration error:", error);
+        return "Network Error: Failed to Register User during API call.";
+    }
+}

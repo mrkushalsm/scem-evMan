@@ -9,6 +9,7 @@ export interface BaseProblem {
   type: "coding" | "mcq"; // Primary identification field
   savedAnswer?: string[]; // Persisted MCQ answer
   savedCode?: string;     // Persisted Code
+  savedLanguage?: string; // Persisted Language for Code
 }
 
 export interface CodingProblem extends BaseProblem {

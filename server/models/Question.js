@@ -17,7 +17,10 @@ const questionSchema = new mongoose.Schema({
     type: String,
     enum: ['Single Correct', 'Multiple Correct', 'Coding'],
   },
-  options: [String],
+  options: {
+    type: [String],
+    default: undefined
+  },
   correctAnswer: String,
   // Coding specific fields
   constraints: String,

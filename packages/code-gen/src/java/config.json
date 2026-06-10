@@ -26,6 +26,10 @@
     "float_array": {
       "reader": "int {var}_size = scanner.nextInt(); float[] {var} = new float[{var}_size]; for(int i=0; i<{var}_size; i++) { {var}[i] = scanner.nextFloat(); }",
       "hint": "float[]"
+    },
+    "string_array": {
+      "reader": "int {var}_size = scanner.nextInt(); String[] {var} = new String[{var}_size]; for(int i=0; i<{var}_size; i++) { {var}[i] = scanner.next(); }",
+      "hint": "String[]"
     }
   }
 }

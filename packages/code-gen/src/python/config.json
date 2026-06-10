@@ -26,6 +26,10 @@
     "float_array": {
       "reader": "[float(next(iterator)) for _ in range(int(next(iterator)))]",
       "hint": "list[float]"
+    },
+    "string_array": {
+      "reader": "[next(iterator) for _ in range(int(next(iterator)))]",
+      "hint": "list[str]"
     }
   }
 }

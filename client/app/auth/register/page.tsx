@@ -13,10 +13,10 @@ import { RiLockPasswordFill } from "react-icons/ri";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
-import { register } from "@/app/actions/auth";
+import { register } from "@/actions/auth";
 
 function RegisterForm() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,10 +40,12 @@ function RegisterForm() {
   const validateForm = () => {
     const errors: string[] = [];
 
-    if (!email.trim()) {
-      errors.push("Email is required.");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.push("Please enter a valid email address");
+    if (!username.trim()) {
+      errors.push("Username is required.");
+    } else if (username.length < 3) {
+      errors.push("Username must be at least 3 characters.");
+    } else if (!/^[a-zA-Z0-9_.@]+$/.test(username)) {
+      errors.push("Username can only contain letters, numbers, underscores, periods, and @.");
     }
 
     if (!password.trim()) {
@@ -58,8 +60,8 @@ function RegisterForm() {
       errors.push("Passwords do not match.");
     }
 
-    if (email && password && email === password) {
-      errors.push("Email and password should not be the same.");
+    if (username && password && username === password) {
+      errors.push("Username and password should not be the same.");
     }
 
     if (errors.length > 0) {
@@ -79,8 +81,7 @@ function RegisterForm() {
       setLoading(true);
 
       const formData = new FormData();
-      formData.append("name", email.split("@")[0]); // Default name
-      formData.append("email", email);
+      formData.append("username", username);
       formData.append("password", password);
 
       const result = await register(undefined, formData);
@@ -168,9 +169,10 @@ function RegisterForm() {
                 <Input
                   className="pl-12 pr-4 py-3 bg-muted text-foreground rounded-md"
                   type="text"
-                  placeholder="E-Mail ID"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  name="username"
                 />
               </div>
               <div className="relative">
@@ -226,6 +228,7 @@ function RegisterForm() {
                   {loading ? "Loading..." : "Continue"}
                 </Button>
 
+                {/*
                 <div className="flex items-center my-2">
                   <hr className="grow border-muted" />
                   <span className="px-4 text-sm text-muted-foreground">OR</span>
@@ -251,6 +254,7 @@ function RegisterForm() {
                     </>
                   )}
                 </Button>
+                */}
               </div>
             </form>
 

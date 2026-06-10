@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Fragment } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ModeToggle } from "./theme-toggle";
 import { usePathname } from "next/navigation";
@@ -28,9 +29,22 @@ export default function Navbar() {
         {/* Logo/Brand */}
         <div className="flex items-center">
           <Link href="/">
-            <span className="font-semibold text-foreground text-lg cursor-pointer">
-              SOSC
-            </span>
+            <Image
+              src="/pomelo_black.svg"
+              alt="Pomelo"
+              width={117}
+              height={32}
+              className="block dark:hidden h-8 w-auto cursor-pointer"
+              priority
+            />
+            <Image
+              src="/pomelo_white.svg"
+              alt="Pomelo"
+              width={117}
+              height={32}
+              className="hidden dark:block h-8 w-auto cursor-pointer"
+              priority
+            />
           </Link>
         </div>
 

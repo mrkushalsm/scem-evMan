@@ -13,19 +13,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save } from "lucide-react";
 import { useActionState, useTransition, useEffect } from "react";
 import TestQuestions from "../questions-list";
-import { saveTest } from "@/app/actions/save-test";
+import { saveTest } from "@/actions/save-test";
 import { toast } from "sonner";
+import { formatTimeForDisplay } from "@/lib/date-utils";
 
 import { Problem } from "@/types/problem";
-
-function formatTimeForDisplay(date: Date) {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? "PM" : "AM";
-  const normalizedHours = hours % 12 || 12;
-
-  return `${String(normalizedHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`;
-}
 
 function getDefaultSchedule() {
   const start = new Date(Date.now() + 10 * 60 * 1000);
@@ -42,6 +34,7 @@ function getDefaultSchedule() {
   return {
     startsAt: start.toISOString(),
     duration: formatTimeForDisplay(end),
+    endsAt: end.toISOString(),
   };
 }
 
@@ -55,6 +48,7 @@ export default function TestForm({ testData, availableQuestions = [] }: { testDa
       description: "",
       startsAt: defaultSchedule.startsAt,
       duration: defaultSchedule.duration,
+      endsAt: defaultSchedule.endsAt,
       status: "waiting",
       problems: [],
       rules: [],

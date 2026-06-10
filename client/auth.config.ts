@@ -3,13 +3,14 @@ import type { NextAuthConfig } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import { z } from "zod"
 import { SignJWT } from "jose"
+import { getBaseUrl } from "@/lib/env";
 
 // Helper to mint a token for the Express Request
 // this minting happens on Next.js server side.
 interface User {
     id?: string;
     _id?: string;
-    email?: string | null;
+    username?: string | null;
     role?: string;
     name?: string | null;
 }
@@ -23,7 +24,7 @@ async function mintBackendToken(user: User) {
     const jwt = await new SignJWT({
         userId: user._id || user.id,
         role: user.role,
-        email: user.email
+        username: user.username
     })
         .setProtectedHeader({ alg })
         .setIssuedAt()
@@ -34,6 +35,13 @@ async function mintBackendToken(user: User) {
 }
 
 export const authConfig = {
+    secret: process.env.AUTH_SECRET,
+    logger: {
+        error(error: any) {
+            if (error?.name === 'CredentialsSignin' || error?.type === 'CredentialsSignin' || error?.code === 'credentials') return;
+            console.error(error);
+        }
+    },
     pages: {
         signIn: '/auth/login',
     },
@@ -65,6 +73,7 @@ export const authConfig = {
                 const u = user as User;
                 token.role = u.role
                 token.id = u.id || u._id
+                token.username = u.username
 
                 // Mint a fresh backend token
                 const backendToken = await mintBackendToken(u);
@@ -76,6 +85,7 @@ export const authConfig = {
             if (token && session.user) {
                 session.user.role = token.role as string
                 session.user.id = token.id as string
+                session.user.username = token.username as string
                 session.backendToken = token.backendToken as string
             }
             return session
@@ -85,17 +95,17 @@ export const authConfig = {
         Credentials({
             async authorize(credentials) {
                 const parsedCredentials = z
-                    .object({ email: z.string().email(), password: z.string().min(6) })
+                    .object({ username: z.string().min(3), password: z.string().min(6) })
                     .safeParse(credentials);
 
                 if (parsedCredentials.success) {
-                    const { email, password } = parsedCredentials.data;
+                    const { username, password } = parsedCredentials.data;
 
                     try {
-                        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/login`, {
+                        const res = await fetch(`${getBaseUrl()}/api/auth/login`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, password })
+                            body: JSON.stringify({ username, password })
                         });
 
                         const data = await res.json();
@@ -104,15 +114,15 @@ export const authConfig = {
                             return data.user;
                         }
 
-                        console.log('Login failed:', data.message);
+
                         return null;
-                    } catch (error) {
-                        console.error('Auth API error:', error);
+                    } catch (error: any) {
+                        console.error(`Auth API error: ${error.message || 'Unknown error'}`);
                         return null;
                     }
                 }
 
-                console.log('Invalid credentials format');
+
                 return null;
             },
         }),

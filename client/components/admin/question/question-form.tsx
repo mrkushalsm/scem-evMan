@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, Fragment, useActionState, useTransition, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { QuestionSchema, questionSchema } from "@/types/problem";
-import { saveQuestion } from "@/app/actions/save-question";
+import { saveQuestion } from "@/actions/save-question";
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,11 @@ interface Props {
   isCreating: boolean;
   initialData?: Partial<QuestionSchema> | null;
 }
+
+const parsePoints = (value: string | undefined) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 export default function QuestionForm({ type, isCreating, initialData }: Props) {
   const router = useRouter();
@@ -135,12 +140,12 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
           output: tc.output as string,
           isVisible: tc.isVisible as boolean ?? false,
         }));
-        
+
         startTransition(() => {
           formAction(submissionData as QuestionSchema);
         });
       } catch (error) {
-         console.error("Serialization failed", error);
+        console.error("Serialization failed", error);
       }
     } else {
       startTransition(() => {
@@ -222,7 +227,7 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
           title: rowData.title || '',
           description: rowData.description || '',
           difficulty: (rowData.difficulty?.toLowerCase() || 'easy') as 'easy' | 'medium' | 'hard',
-          points: parseInt(rowData.marks || '0', 10),
+          points: parsePoints(rowData.marks),
           questionType: rowData.questionType?.toLowerCase().includes('multiple') ? 'multiple' : 'single',
           options: options.slice(0, 4).map((text, i) => ({ id: String(i), text })),
           correctAnswer: rowData.correctAnswer || '',
@@ -257,7 +262,7 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
           title: rowData.title || '',
           description: rowData.description || '',
           difficulty: (rowData.difficulty?.toLowerCase() || 'easy') as 'easy' | 'medium' | 'hard',
-          points: parseInt(rowData.marks || '0', 10),
+          points: parsePoints(rowData.marks),
           constraints: rowData.constraints ? [rowData.constraints] : [''],
           inputFormat: rowData.inputFormat || '',
           outputFormat: rowData.outputFormat || '',

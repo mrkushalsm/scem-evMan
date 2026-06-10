@@ -15,6 +15,7 @@ export interface Test {
   duration: string;
   totalQuestions: number;
   startsAt: string;
+  endsAt?: string;
   status: "waiting" | "ongoing" | "completed";
   participantsInProgress: number;
   participantsCompleted: number;

@@ -11,8 +11,15 @@ const validateJoinId = async (req, res, next) => {
     try {
         const { joinId } = req.body;
 
+        if (typeof joinId !== 'string' || !/^\d{6}$/.test(joinId.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: "Join ID must be a 6-digit code."
+            });
+        }
+
         // Search the database for the 6-digit joinCode
-        const contest = await Contest.findOne({ joinId: joinId });
+        const contest = await Contest.findOne({ joinId: joinId.trim() });
 
         if (!contest) {
             return res.status(404).json({
@@ -146,7 +153,8 @@ const getContestData = async (req, res, next) => {
                 if (s.question) {
                     answerMap[s.question.toString()] = {
                         answer: s.answer,
-                        code: s.code
+                        code: s.code,
+                        language: s.language
                     };
                 }
             });
@@ -174,7 +182,8 @@ const getContestData = async (req, res, next) => {
                     options: q.options,
                     marks: q.marks,
                     savedAnswer: answerMap[q._id.toString()] ? answerMap[q._id.toString()].answer : undefined,
-                    savedCode: answerMap[q._id.toString()] ? answerMap[q._id.toString()].code : undefined
+                    savedCode: answerMap[q._id.toString()] ? answerMap[q._id.toString()].code : undefined,
+                    savedLanguage: answerMap[q._id.toString()] ? answerMap[q._id.toString()].language : undefined
                 }))
             }
         });
@@ -282,7 +291,7 @@ const listAllContests = async (req, res, next) => {
 // @access  Private (Admin only)
 const getLeaderboard = async (req, res, next) => {
     try {
-        const contest = await Contest.findById(req.params.id);
+        const contest = await Contest.findById(req.params.id).populate('questions');
         if (!contest) {
             return res.status(404).json({ success: false, message: 'Contest not found' });
         }
@@ -331,6 +340,7 @@ const getLeaderboard = async (req, res, next) => {
                 title: contest.title,
                 endTime: contest.endTime,
                 totalParticipants: leaderboard.length,
+                maxScore: (contest.questions || []).reduce((sum, q) => sum + (q.marks || 0), 0),
                 leaderboard
             }
         });
