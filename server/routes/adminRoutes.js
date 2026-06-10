@@ -16,6 +16,7 @@ const {
   deleteContest,
   getAdminStats,
   importQuestions,
+  exportQuestion,
   getAdminSubmissionDetail,
   exportContestResults,
 } = require("../controllers/adminCon");
@@ -23,14 +24,16 @@ const { getData, getOne } = require("../controllers/dataCon");
 
 const router = express.Router();
 
-// Multer config for CSV upload (memory storage)
+// Multer config for CSV/JSON upload (memory storage)
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+    const isCsv = file.mimetype === 'text/csv' || file.originalname.endsWith('.csv');
+    const isJson = file.mimetype === 'application/json' || file.originalname.endsWith('.json');
+    if (isCsv || isJson) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed'), false);
+      cb(new Error('Only CSV and JSON files are allowed'), false);
     }
   },
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
@@ -39,6 +42,7 @@ const upload = multer({
 // Questions
 router.post("/questions/create", requireAuth(), isAdmin, createProblem);
 router.post("/questions/import/:type", requireAuth(), isAdmin, upload.single('file'), importQuestions);
+router.get("/questions/:id/export", requireAuth(), isAdmin, exportQuestion);
 router.put("/questions/:id/edit", requireAuth(), isAdmin, updateProblem);
 router.get("/questions/:id", requireAuth(), isAdmin, getProblemDetail);
 router.delete("/questions/:id", requireAuth(), isAdmin, deleteQuestion);
