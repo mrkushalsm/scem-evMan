@@ -28,8 +28,10 @@ export function resolveWorkspaceRoot(): string {
  * Returns true if running in local development mode.
  */
 export function isDevMode(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  if (process.env.POMELO_DEV === "true") return true;
   const root = resolveWorkspaceRoot();
-  return root !== "/opt/pomelo" || process.env.NODE_ENV === "development";
+  return root !== "/opt/pomelo";
 }
 
 /**
