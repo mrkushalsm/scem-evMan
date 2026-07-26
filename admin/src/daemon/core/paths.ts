@@ -1,9 +1,10 @@
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
+import { resolveWorkspaceRoot } from "./dev";
 import type { Paths } from "./types";
 
 export function getPaths(): Paths {
-  const root = process.env.POMELO_ROOT ?? "/opt/pomelo";
+  const root = resolveWorkspaceRoot();
   const apiHost = process.env.POMELO_HOST ?? "127.0.0.1";
   const apiPort = Number(process.env.POMELO_PORT ?? "8462");
   const configDir = join(root, "config");
@@ -11,8 +12,11 @@ export function getPaths(): Paths {
   const runtimeDir = join(root, "runtime");
   const logsDir = join(runtimeDir, "logs");
   const tmpDir = join(runtimeDir, "tmp");
-  const uiDistDir = join(root, "app", "admin", "dist");
-  const envFile = join(configDir, "app.env");
+  const uiDistDir = existsSync(join(root, "app", "admin", "dist"))
+    ? join(root, "app", "admin", "dist")
+    : join(root, "admin", "dist");
+  const appEnvPath = join(configDir, "app.env");
+  const envFile = existsSync(appEnvPath) ? appEnvPath : (existsSync(join(root, ".env")) ? join(root, ".env") : appEnvPath);
   const configFile = join(configDir, "config.yaml");
   const caddyFile = join(configDir, "Caddyfile");
   const judge0File = join(configDir, "judge0.conf");
@@ -35,10 +39,17 @@ export function getPaths(): Paths {
 }
 
 export function getComposeConfig() {
+  const root = resolveWorkspaceRoot();
+  const baseDir = existsSync(join(root, "app", "docker")) ? join(root, "app") : root;
+
+  const appDev = join(baseDir, "docker/app/docker-compose.dev.yaml");
+  const appProd = join(baseDir, "docker/app/docker-compose.yaml");
+  const judgeDev = join(baseDir, "docker/judge0/docker-compose.dev.yaml");
+  const judgeProd = join(baseDir, "docker/judge0/docker-compose.yaml");
+
   return {
-    app: process.env.POMELO_APP_COMPOSE ?? "docker/app/docker-compose.yaml",
-    judge:
-      process.env.POMELO_JUDGE0_COMPOSE ?? "docker/judge0/docker-compose.yaml",
+    app: process.env.POMELO_APP_COMPOSE ?? (existsSync(appDev) ? appDev : appProd),
+    judge: process.env.POMELO_JUDGE0_COMPOSE ?? (existsSync(judgeDev) ? judgeDev : judgeProd),
     project: process.env.POMELO_DOCKER_PROJECT ?? "pomelo",
   };
 }

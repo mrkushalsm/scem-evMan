@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
+import { resolveWorkspaceRoot } from "../../daemon/core/dev";
 
-export const APP_ROOT = process.env.POMELO_ROOT ?? "/opt/pomelo";
-export const DEFAULT_DAEMON_BIN = `${APP_ROOT}/app/admin/bin/pomelod`;
+export const APP_ROOT = resolveWorkspaceRoot();
 
 function resolveApiBase(): string {
   if (process.env.POMELO_API_URL) return process.env.POMELO_API_URL;

@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite ui",
+    "dev": "concurrently -n daemon,ui -c blue,green \"bun --watch ./src/pomelod.ts\" \"vite ui\"",
+    "dev:daemon": "bun --watch ./src/pomelod.ts",
+    "dev:ui": "vite ui",
     "build": "pnpm build:cli && pnpm build:ui",
     "build:cli": "bun build ./src/pomelo.ts --compile --outfile ./bin/pomelo && bun build ./src/pomelod.ts --compile --outfile ./bin/pomelod",
     "build:ui": "vite build ui",
@@ -28,6 +30,7 @@
     "@tailwindcss/vite": "^4.1.8",
     "@types/bun": "^1.3.14",
     "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.1.2",
     "tailwindcss": "^4.1.8",
     "typescript": "^6.0.3",
     "vite": "^6.0.0"
