@@ -1,0 +1,35 @@
+{
+  "questions": [
+    {
+      "type": "mcq",
+      "title": "What is the time complexity of binary search?",
+      "description": "Binary search finds the position of a target value within a sorted array.",
+      "marks": 10,
+      "difficulty": "Easy",
+      "questionType": "Single Correct",
+      "options": ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
+      "correctAnswer": "O(log n)"
+    },
+    {
+      "type": "coding",
+      "title": "Two Sum",
+      "description": "Return indices of the two numbers that add up to the target.",
+      "marks": 30,
+      "difficulty": "Easy",
+      "constraints": "2 <= nums.length <= 10^4",
+      "inputFormat": "First line: n and target. Second line: n integers",
+      "outputFormat": "Two space-separated indices",
+      "functionName": "twoSum",
+      "inputVariables": [
+        { "variable": "nums", "type": "int_array" },
+        { "variable": "target", "type": "int" }
+      ],
+      "testcases": [
+        { "input": "4 9\n2 7 11 15", "output": "0 1", "isVisible": true }
+      ]
+    }
+  ],
+  "meta": {
+    "description": "Sample bulk import file: one MCQ and one coding question"
+  }
+}

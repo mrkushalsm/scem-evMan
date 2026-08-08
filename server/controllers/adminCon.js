@@ -777,11 +777,10 @@ const exportQuestion = async (req, res, next) => {
     }
 };
 
-// @desc Import questions from CSV or JSON
+// @desc Import questions from JSON
 const importQuestions = async (req, res, next) => {
     try {
         await connectDB();
-        const { type } = req.params; // 'mcq' or 'coding'
 
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -789,174 +788,32 @@ const importQuestions = async (req, res, next) => {
 
         const fileContent = req.file.buffer.toString('utf-8');
 
-        // Try to detect if file is JSON or CSV
-        let isJSON = false;
-        try {
-            JSON.parse(fileContent);
-            isJSON = true;
-        } catch {
-            isJSON = false;
-        }
+        const result = processImportJSON(fileContent);
 
-        if (isJSON) {
-            // Handle JSON import
-            const result = processImportJSON(fileContent);
-
-            if (!result.valid) {
-                const errorMessages = result.errors
-                    .map(e => `${e.field ? `Field "${e.field}"` : ''}: ${e.message}`)
-                    .join('; ');
-                return res.status(400).json({
-                    success: false,
-                    error: `JSON validation failed: ${errorMessages}`,
-                    errors: result.errors
-                });
-            }
-
-            // Insert validated questions
-            let imported = 0;
-            if (result.queries && result.queries.length > 0) {
-                const insertResult = await Question.insertMany(result.queries);
-                imported = insertResult.length;
-            }
-
-            return res.status(200).json({
-                success: true,
-                imported,
-                total: result.queries ? result.queries.length : 0,
-                errors: result.errors.length > 0 ? result.errors : undefined,
-            });
-        } else {
-            // Handle CSV import (legacy)
-            if (!['mcq', 'coding'].includes(type)) {
-                return res.status(400).json({ success: false, error: 'Invalid question type. Must be "mcq" or "coding"' });
-            }
-
-            const { parse } = require('csv-parse/sync');
-
-            let records;
-            try {
-                records = parse(fileContent, {
-                    columns: true,
-                    skip_empty_lines: true,
-                    trim: true,
-                });
-            } catch (parseError) {
-                return res.status(400).json({ success: false, error: `CSV parsing failed: ${parseError.message}` });
-            }
-
-            if (!records.length) {
-                return res.status(400).json({ success: false, error: 'CSV file is empty' });
-            }
-
-            const errors = [];
-            const questionsToInsert = [];
-
-            for (let i = 0; i < records.length; i++) {
-                const row = records[i];
-                const rowNum = i + 2; // +2 for header row and 1-indexing
-
-                try {
-                    if (type === 'mcq') {
-                        // Validate MCQ required fields
-                        if (!row.title || !row.description || !row.difficulty || !row.marks || !row.questionType || !row.options || !row.correctAnswer) {
-                            errors.push({ row: rowNum, error: 'Missing required fields' });
-                            continue;
-                        }
-
-                        let options;
-                        try {
-                            options = JSON.parse(row.options);
-                        } catch {
-                            errors.push({ row: rowNum, error: 'Invalid JSON in options field' });
-                            continue;
-                        }
-
-                        questionsToInsert.push({
-                            type: 'mcq',
-                            title: row.title,
-                            description: row.description,
-                            difficulty: row.difficulty,
-                            marks: parseInt(row.marks, 10),
-                            questionType: row.questionType,
-                            options,
-                            correctAnswer: row.correctAnswer,
-                        });
-                    } else {
-                        // Validate Coding required fields
-                        if (!row.title || !row.description || !row.difficulty || !row.marks || !row.functionName || !row.inputVariables) {
-                            errors.push({ row: rowNum, error: 'Missing required fields' });
-                            continue;
-                        }
-
-                        let inputVariables, testcases;
-                        try {
-                            inputVariables = JSON.parse(row.inputVariables);
-                        } catch {
-                            errors.push({ row: rowNum, error: 'Invalid JSON in inputVariables field' });
-                            continue;
-                        }
-
-                        try {
-                            testcases = row.testcases ? JSON.parse(row.testcases) : [];
-                        } catch {
-                            errors.push({ row: rowNum, error: 'Invalid JSON in testcases field' });
-                            continue;
-                        }
-
-                        // Auto-generate boilerplate code
-                        const boilerplateCode = {};
-                        const supportedLangs = ['c', 'java', 'python'];
-                        const inputs = inputVariables.map(v => ({
-                            variable: v.variable,
-                            type: v.type
-                        }));
-
-                        supportedLangs.forEach(lang => {
-                            try {
-                                const judge = getJudge(lang);
-                                boilerplateCode[lang] = judge.generateBoilerplate({
-                                    method: row.functionName,
-                                    input: inputs
-                                });
-                            } catch (err) {
-                                console.warn(`Skipping boilerplate for ${lang}: ${err.message}`);
-                            }
-                        });
-
-                        questionsToInsert.push({
-                            type: 'coding',
-                            title: row.title,
-                            description: row.description,
-                            difficulty: row.difficulty,
-                            marks: parseInt(row.marks, 10),
-                            constraints: row.constraints || '',
-                            inputFormat: row.inputFormat || '',
-                            outputFormat: row.outputFormat || '',
-                            functionName: row.functionName,
-                            inputVariables,
-                            testcases,
-                            boilerplateCode,
-                        });
-                    }
-                } catch (rowError) {
-                    errors.push({ row: rowNum, error: rowError.message });
-                }
-            }
-
-            let imported = 0;
-            if (questionsToInsert.length > 0) {
-                const result = await Question.insertMany(questionsToInsert);
-                imported = result.length;
-            }
-
-            res.status(200).json({
-                success: true,
-                imported,
-                total: records.length,
-                errors: errors.length > 0 ? errors : undefined,
+        if (!result.valid) {
+            const errorMessages = result.errors
+                .map(e => `${e.field ? `Field "${e.field}"` : ''}: ${e.message}`)
+                .join('; ');
+            return res.status(400).json({
+                success: false,
+                error: `JSON validation failed: ${errorMessages}`,
+                errors: result.errors
             });
         }
+
+        // Insert validated questions
+        let imported = 0;
+        if (result.queries && result.queries.length > 0) {
+            const insertResult = await Question.insertMany(result.queries);
+            imported = insertResult.length;
+        }
+
+        return res.status(200).json({
+            success: true,
+            imported,
+            total: result.queries ? result.queries.length : 0,
+            errors: result.errors.length > 0 ? result.errors : undefined,
+        });
     } catch (error) {
         next(error);
     }

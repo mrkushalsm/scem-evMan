@@ -154,7 +154,11 @@ const seedDatabase = async () => {
 
     // Seed Users
     console.log('Seeding users...');
-    const createdUsers = await User.insertMany(users);
+    const usersWithUsername = users.map((user) => ({
+      ...user,
+      username: user.email.split('@')[0],
+    }));
+    const createdUsers = await User.insertMany(usersWithUsername);
     console.log(`${createdUsers.length} users created.`);
 
     // Get admin user for contest author
@@ -245,10 +249,10 @@ const seedDatabase = async () => {
     console.log(`   Contests: ${createdContests.length}`);
     console.log(`   Submissions: ${createdSubmissions.length}`);
     console.log('\\n🔐 Admin credentials:');
-    console.log(`   Email: ${adminUser.email}`);
+    console.log(`   Username: ${adminUser.username}`);
     console.log(`   Password: admin123`);
     console.log('\\n🔐 User credentials:');
-    console.log(`   Email: ${regularUser.email}`);
+    console.log(`   Username: ${regularUser.username}`);
     console.log(`   Password: user123`);
 
   } catch (error) {

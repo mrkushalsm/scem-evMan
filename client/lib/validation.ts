@@ -6,10 +6,18 @@ export interface ClientValidationError {
   index?: number;
 }
 
+export interface QuestionPreview {
+  title: string;
+  type: string;
+  marks?: number;
+  difficulty?: string;
+}
+
 export interface ClientValidationResult {
   valid: boolean;
   errors: ClientValidationError[];
   count?: number;
+  preview?: QuestionPreview[];
 }
 
 /**
@@ -140,10 +148,21 @@ export function validateImportJSONClient(jsonString: string): ClientValidationRe
     }
   });
 
+  const preview: QuestionPreview[] = questions.map((q, idx) => ({
+    title:
+      q?.title && typeof q.title === 'string' && q.title.trim() !== ''
+        ? q.title
+        : `(Question ${idx + 1} missing title)`,
+    type: q?.type && typeof q.type === 'string' ? q.type : 'unknown',
+    marks: typeof q?.marks === 'number' ? q.marks : undefined,
+    difficulty: typeof q?.difficulty === 'string' ? q.difficulty : undefined,
+  }));
+
   return {
     valid: errors.length === 0,
     errors,
     count: questions.length,
+    preview,
   };
 }
 

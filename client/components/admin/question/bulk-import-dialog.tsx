@@ -1,20 +1,48 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, AlertCircle, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, AlertTriangle, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { importQuestions } from "@/app/actions/import-questions";
+import { importQuestions } from "@/actions/import-questions";
 import { validateImportJSONClient } from "@/lib/validation";
+
+const EXAMPLE_JSON_PLACEHOLDER = `{
+  "questions": [
+    {
+      "type": "mcq",
+      "title": "What is the time complexity of binary search?",
+      "description": "...",
+      "marks": 10,
+      "difficulty": "Easy",
+      "questionType": "Single Correct",
+      "options": ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
+      "correctAnswer": "O(log n)"
+    },
+    {
+      "type": "coding",
+      "title": "Two Sum",
+      "description": "...",
+      "marks": 30,
+      "difficulty": "Easy",
+      "inputFormat": "...",
+      "outputFormat": "...",
+      "functionName": "twoSum",
+      "inputVariables": [{ "variable": "nums", "type": "int_array" }],
+      "testcases": [{ "input": "...", "output": "..." }]
+    }
+  ]
+}`;
 
 interface ImportResult {
   valid: boolean;
   errors: Array<{ field?: string; message: string; index?: number }>;
   warnings?: string[];
   count?: number;
+  preview?: Array<{ title: string; type: string; marks?: number; difficulty?: string }>;
 }
 
 interface BulkImportDialogProps {
@@ -84,8 +112,8 @@ export default function BulkImportDialog({
       const formData = new FormData();
       formData.append("file", blob, "questions.json");
 
-      // Call server action - it handles both JSON and CSV, and mixed types
-      // Use 'coding' as default type; server detects actual types from JSON
+      // Call server action - it handles bulk/single/mixed-type JSON imports
+      // 'coding' is just a placeholder path param; server detects actual types from JSON
       const result = await importQuestions("coding", formData);
 
       if (!result.success) {
@@ -134,10 +162,19 @@ export default function BulkImportDialog({
             </div>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+
+          <div className="flex justify-end mb-4">
+            <a href="/templates/questions_import_example.json" download>
+              <Button variant="outline" size="sm" type="button" className="gap-2">
+                <Download className="w-4 h-4" />
+                Download Sample
+              </Button>
+            </a>
           </div>
 
           <Tabs defaultValue="paste" className="w-full">
@@ -154,11 +191,11 @@ export default function BulkImportDialog({
                 <Textarea
                   value={jsonInput}
                   onChange={(e) => handleJsonInputChange(e.target.value)}
-                  placeholder='{"questions": [...]}'
+                  placeholder={EXAMPLE_JSON_PLACEHOLDER}
                   className="font-mono text-sm h-64"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  Accepts bulk format: {"{ questions: [...] }"} or single question JSON
+                <p className="text-xs text-muted-foreground mt-2">
+                  Accepts bulk format: {"{ questions: [...] }"} or single question JSON. Not sure of the shape? Download the sample above.
                 </p>
               </div>
 
@@ -180,11 +217,11 @@ export default function BulkImportDialog({
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
                 <p className="text-sm font-medium mb-2">
                   Click to upload or drag and drop
                 </p>
-                <p className="text-xs text-gray-500 mb-4">JSON files only</p>
+                <p className="text-xs text-muted-foreground mb-4">JSON files only</p>
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
@@ -200,30 +237,55 @@ export default function BulkImportDialog({
               <h3 className="font-semibold text-sm">Validation Results</h3>
 
               {validationResult.valid ? (
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
+                <Alert className="border-green-200 bg-green-100 dark:border-green-900/50 dark:bg-green-900/30">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <AlertDescription className="text-green-700 dark:text-green-400">
                     ✓ JSON is valid! Ready to import {validationResult.count} question
                     {validationResult.count !== 1 ? "s" : ""}.
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Alert className="border-red-200 bg-red-50">
-                  <AlertCircle className="w-4 h-4 text-red-600" />
-                  <AlertDescription className="text-red-800">
+                <Alert className="border-red-200 bg-red-100 dark:border-red-900/50 dark:bg-red-900/30">
+                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  <AlertDescription className="text-red-700 dark:text-red-400">
                     Validation failed. See errors below.
                   </AlertDescription>
                 </Alert>
               )}
 
+              {validationResult.preview && validationResult.preview.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    Questions found ({validationResult.preview.length})
+                  </p>
+                  <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+                    {validationResult.preview.map((q, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                      >
+                        <span className="truncate">{q.title}</span>
+                        <span className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
+                          <span className="rounded-full bg-muted px-2 py-0.5 uppercase tracking-wide">
+                            {q.type}
+                          </span>
+                          {q.difficulty && <span>{q.difficulty}</span>}
+                          {q.marks !== undefined && <span>{q.marks} pts</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {validationResult.errors.length > 0 && (
-                <div className="bg-gray-50 border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                <div className="bg-muted border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
                   {validationResult.errors.map((err, idx) => (
                     <div
                       key={idx}
-                      className="text-xs text-red-700 flex items-start gap-2"
+                      className="text-xs text-red-700 dark:text-red-400 flex items-start gap-2"
                     >
-                      <span className="text-red-500 mt-0.5">•</span>
+                      <span className="text-red-500 dark:text-red-400 mt-0.5">•</span>
                       <span>
                         {err.index !== undefined && (
                           <span className="font-mono">
@@ -239,11 +301,11 @@ export default function BulkImportDialog({
               )}
 
               {validationResult.warnings && validationResult.warnings.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 space-y-2">
+                <div className="bg-yellow-100 border border-yellow-200 dark:bg-yellow-900/30 dark:border-yellow-900/50 rounded-lg p-3 space-y-2">
                   {validationResult.warnings.map((warn, idx) => (
                     <div
                       key={idx}
-                      className="text-xs text-yellow-700 flex items-start gap-2"
+                      className="text-xs text-yellow-700 dark:text-yellow-400 flex items-start gap-2"
                     >
                       <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                       <span>{warn}</span>
@@ -258,18 +320,20 @@ export default function BulkImportDialog({
             <Alert
               className={
                 importStatus.success
-                  ? "border-green-200 bg-green-50 mt-6"
-                  : "border-red-200 bg-red-50 mt-6"
+                  ? "border-green-200 bg-green-100 dark:border-green-900/50 dark:bg-green-900/30 mt-6"
+                  : "border-red-200 bg-red-100 dark:border-red-900/50 dark:bg-red-900/30 mt-6"
               }
             >
               {importStatus.success ? (
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-red-600" />
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
               )}
               <AlertDescription
                 className={
-                  importStatus.success ? "text-green-800" : "text-red-800"
+                  importStatus.success
+                    ? "text-green-700 dark:text-green-400"
+                    : "text-red-700 dark:text-red-400"
                 }
               >
                 {importStatus.message}
