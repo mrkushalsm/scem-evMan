@@ -3,6 +3,7 @@ import { join } from "path";
 import { dockerAvailable, runCompose } from "./compose";
 import { ComposeCommand } from "./compose-command";
 import { getOperationState } from "./operations";
+import { isDevMode } from "../core/dev";
 import { run } from "../core/run";
 import type { Paths } from "../core/types";
 
@@ -48,6 +49,7 @@ export async function getStatus(paths: Paths) {
 
   return {
     currentVersion: current,
+    isDev: isDevMode(),
     dockerAvailable: dockerOk,
     releases: [],
     containers,
@@ -73,5 +75,6 @@ async function diskUsage(path: string) {
   const res = await run("du", ["-sk", path]);
   if (res.code !== 0 || !res.stdout.trim()) return { bytes: 0 };
   const sizeKb = Number(res.stdout.trim().split(/\s+/)[0]);
+  if (isNaN(sizeKb)) return { bytes: 0 };
   return { bytes: sizeKb * 1024 };
 }

@@ -383,24 +383,26 @@ const createContest = async (req, res, next) => {
             return res.status(400).json({ success: false, error: 'Start time cannot be in the past' });
         }
 
-        // Generate Unique 6-digit Join ID
-        let joinId;
-        let isUnique = false;
-        while (!isUnique) {
-            joinId = Math.floor(100000 + Math.random() * 900000).toString();
-            const existing = await Contest.findOne({ joinId });
-            if (!existing) isUnique = true;
+        // Generate unique 6-digit Join ID — rely on the unique index to detect collisions
+        let newContest;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const joinId = Math.floor(100000 + Math.random() * 900000).toString();
+            try {
+                newContest = new Contest({
+                    title, description, startTime, endTime,
+                    questions: problemIds,
+                    rules,
+                    joinId,
+                    author: author || "Admin"
+                });
+                await newContest.save();
+                break;
+            } catch (err) {
+                if (err.code === 11000) continue; // duplicate joinId — retry
+                throw err;
+            }
         }
-
-        const newContest = new Contest({
-            title, description, startTime, endTime,
-            questions: problemIds,
-            rules,
-            joinId,
-            author: author || "Admin"
-        });
-
-        await newContest.save();
+        if (!newContest) throw new Error('Failed to generate a unique join ID after 10 attempts');
         res.status(200).json({ success: true, contestId: newContest._id });
     } catch (error) {
         next(error);
@@ -418,31 +420,33 @@ const cloneContest = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Original contest not found' });
         }
 
-        // Generate Unique 6-digit Join ID
-        let joinId;
-        let isUnique = false;
-        while (!isUnique) {
-            joinId = Math.floor(100000 + Math.random() * 900000).toString();
-            const existing = await Contest.findOne({ joinId });
-            if (!existing) isUnique = true;
-        }
-
         const now = new Date();
         const startTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
         const endTime = new Date(now.getTime() + 48 * 60 * 60 * 1000);   // 48 hours from now
 
-        const newContest = new Contest({
-            title: `Copy of ${originalContest.title}`,
-            description: originalContest.description,
-            startTime,
-            endTime,
-            questions: originalContest.questions,
-            rules: originalContest.rules,
-            joinId,
-            author: originalContest.author || "Admin"
-        });
-
-        await newContest.save();
+        // Generate unique 6-digit Join ID — rely on the unique index to detect collisions
+        let newContest;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const joinId = Math.floor(100000 + Math.random() * 900000).toString();
+            try {
+                newContest = new Contest({
+                    title: `Copy of ${originalContest.title}`,
+                    description: originalContest.description,
+                    startTime,
+                    endTime,
+                    questions: originalContest.questions,
+                    rules: originalContest.rules,
+                    joinId,
+                    author: originalContest.author || "Admin"
+                });
+                await newContest.save();
+                break;
+            } catch (err) {
+                if (err.code === 11000) continue; // duplicate joinId — retry
+                throw err;
+            }
+        }
+        if (!newContest) throw new Error('Failed to generate a unique join ID after 10 attempts');
         res.status(200).json({ success: true, contestId: newContest._id, joinId: newContest.joinId });
     } catch (error) {
         next(error);

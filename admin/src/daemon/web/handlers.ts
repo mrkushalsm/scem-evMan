@@ -14,6 +14,6 @@ export function createRequestHandler(paths: Paths) {
       return handleApi(req, url, method);
     }
 
-    return serveUi(paths, path);
+    return serveUi(paths, path, req);
   };
 }

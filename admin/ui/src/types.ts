@@ -7,6 +7,7 @@ export type Release = {
 
 export type Status = {
   currentVersion: string | null;
+  isDev?: boolean;
   dockerAvailable: boolean;
   releases: Release[];
   containers: ContainerInfo[];

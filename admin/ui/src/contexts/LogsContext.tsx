@@ -44,8 +44,6 @@ export function LogsProvider({ children }: { children: React.ReactNode }) {
         () => {
           streamRef.current = false;
           setIsStreaming(false);
-          // Retain logs if they just finished
-          setLiveLog((prev) => prev || null);
         },
         abortController.signal
       );

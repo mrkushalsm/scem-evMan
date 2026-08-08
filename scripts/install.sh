@@ -515,6 +515,7 @@ RestartSec=5
 StartLimitIntervalSec=60
 StartLimitBurst=5
 Environment=POMELO_ROOT=$APP_ROOT
+Environment=NODE_ENV=production
 
 NoNewPrivileges=false
 

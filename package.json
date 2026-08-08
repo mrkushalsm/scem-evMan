@@ -5,7 +5,9 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "start": "turbo run start",
-    "dev": "pnpm --filter @pomelo/code-gen build && turbo run dev",
+    "dev:infra": "docker compose -f docker/app/docker-compose.dev.yaml -f docker/judge0/docker-compose.dev.yaml --project-directory . up mongo judge0-server judge0-workers -d --remove-orphans",
+    "dev:down": "docker compose -f docker/app/docker-compose.dev.yaml -f docker/judge0/docker-compose.dev.yaml --project-directory . down --remove-orphans",
+    "dev": "trap 'pnpm dev:down' EXIT INT TERM; pnpm dev:infra && pnpm --filter @pomelo/code-gen build && turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",

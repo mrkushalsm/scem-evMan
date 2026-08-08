@@ -238,12 +238,6 @@ const submitCode = async (req, res, next) => {
             else overallStatus = "Wrong Answer";
         }
 
-        // Save submission
-        let submission = await Submission.findOne({ contest: contestId, user: userId });
-        if (!submission) {
-            submission = new Submission({ contest: contestId, user: userId, submissions: [] });
-        }
-
         const entry = {
             question: questionId,
             code,
@@ -254,12 +248,37 @@ const submitCode = async (req, res, next) => {
             submittedAt: new Date()
         };
 
-        const existingIdx = submission.submissions.findIndex(s => s.question.toString() === questionId);
-        if (existingIdx > -1) submission.submissions[existingIdx] = entry;
-        else submission.submissions.push(entry);
-
-        submission.totalScore = submission.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0);
-        await submission.save();
+        // Save submission atomically
+        const existingSubmission = await Submission.findOne({ contest: contestId, user: userId });
+        if (!existingSubmission) {
+            // First submission — create directly with the entry
+            await Submission.create({
+                contest: contestId,
+                user: userId,
+                submissions: [entry],
+                totalScore: score || 0
+            });
+        } else {
+            const existingIdx = existingSubmission.submissions.findIndex(s => s.question.toString() === questionId);
+            if (existingIdx > -1) {
+                await Submission.findByIdAndUpdate(
+                    existingSubmission._id,
+                    { $set: { [`submissions.${existingIdx}`]: entry } }
+                );
+            } else {
+                await Submission.findByIdAndUpdate(
+                    existingSubmission._id,
+                    { $push: { submissions: entry } }
+                );
+            }
+            // Recalculate total score from DB to avoid stale in-memory state
+            const updated = await Submission.findById(existingSubmission._id);
+            if (updated) {
+                await Submission.findByIdAndUpdate(existingSubmission._id, {
+                    $set: { totalScore: updated.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0) }
+                });
+            }
+        }
 
         const clientResults = results.map(r => ({
             testCase: r.testCase,
@@ -308,8 +327,10 @@ const saveMCQ = async (req, res, next) => {
         const submittedAnswers = Array.isArray(answer) ? answer : [answer];
 
         // correctAnswer in DB is a string of indices, e.g., "0" or "0,2"
-        const correctIndices = questionDoc.correctAnswer.split(',').map(idx => parseInt(idx.trim()));
-        const correctTexts = correctIndices.map(idx => questionDoc.options[idx]);
+        const correctIndices = (questionDoc.correctAnswer || '').split(',')
+            .map(idx => parseInt(idx.trim(), 10))
+            .filter(n => !isNaN(n));
+        const correctTexts = correctIndices.map(idx => questionDoc.options[idx]).filter(Boolean);
 
         const isMultiple = questionDoc.questionType === "Multiple Correct";
 
@@ -325,11 +346,6 @@ const saveMCQ = async (req, res, next) => {
             }
         }
 
-        let submission = await Submission.findOne({ contest: contestId, user: userId });
-        if (!submission) {
-            submission = new Submission({ contest: contestId, user: userId, submissions: [] });
-        }
-
         const entry = {
             question: questionId,
             answer: Array.isArray(answer) ? answer : [answer],
@@ -337,12 +353,34 @@ const saveMCQ = async (req, res, next) => {
             submittedAt: new Date()
         };
 
-        const existingIdx = submission.submissions.findIndex(s => s.question.toString() === questionId);
-        if (existingIdx > -1) submission.submissions[existingIdx] = entry;
-        else submission.submissions.push(entry);
-
-        submission.totalScore = submission.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0);
-        await submission.save();
+        const existingSubmission = await Submission.findOne({ contest: contestId, user: userId });
+        if (!existingSubmission) {
+            await Submission.create({
+                contest: contestId,
+                user: userId,
+                submissions: [entry],
+                totalScore: score || 0
+            });
+        } else {
+            const existingIdx = existingSubmission.submissions.findIndex(s => s.question.toString() === questionId);
+            if (existingIdx > -1) {
+                await Submission.findByIdAndUpdate(
+                    existingSubmission._id,
+                    { $set: { [`submissions.${existingIdx}`]: entry } }
+                );
+            } else {
+                await Submission.findByIdAndUpdate(
+                    existingSubmission._id,
+                    { $push: { submissions: entry } }
+                );
+            }
+            const updatedMcq = await Submission.findById(existingSubmission._id);
+            if (updatedMcq) {
+                await Submission.findByIdAndUpdate(existingSubmission._id, {
+                    $set: { totalScore: updatedMcq.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0) }
+                });
+            }
+        }
 
         return res.status(200).json({ success: true, score });
     } catch (error) {

@@ -23,16 +23,18 @@ export function CodeScreen({ problem }: { problem: CodingProblem }) {
     setIsMounted(true);
     // If we do not have a saved code from the server for the current initial language, check local storage
     if (!problem.savedCode) {
-       const draft = localStorage.getItem(`pomelo_draft_${problem.id}_${initialLanguage}`);
-       if (draft) {
-          setCode(draft);
-       }
+      try {
+        const draft = localStorage.getItem(`pomelo_draft_${problem.id}_${initialLanguage}`);
+        if (draft) setCode(draft);
+      } catch { /* localStorage unavailable (e.g. private browsing) */ }
     }
   }, [problem.id, initialLanguage, problem.savedCode]);
 
   React.useEffect(() => {
     if (isMounted && code !== "") {
-      localStorage.setItem(`pomelo_draft_${problem.id}_${language}`, code);
+      try {
+        localStorage.setItem(`pomelo_draft_${problem.id}_${language}`, code);
+      } catch { /* localStorage unavailable */ }
     }
   }, [code, language, problem.id, isMounted]);
 
@@ -46,7 +48,8 @@ export function CodeScreen({ problem }: { problem: CodingProblem }) {
     }
 
     // Try loading from local storage
-    const draft = localStorage.getItem(`pomelo_draft_${problem.id}_${newLang}`);
+    let draft: string | null = null;
+    try { draft = localStorage.getItem(`pomelo_draft_${problem.id}_${newLang}`); } catch { /* unavailable */ }
     if (draft) {
       setCode(draft);
     } else {

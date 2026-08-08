@@ -31,8 +31,8 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
   const pendingSelectionRef = useRef<string[] | null>(null);
 
   // Create sorting logic matching TestHeader: MCQs first, then Coding
-  const mcqProblems = problems.filter((p) => p.questionType !== "Coding");
-  const codingProblems = problems.filter((p) => p.questionType === "Coding");
+  const mcqProblems = problems.filter((p) => p.type === "mcq");
+  const codingProblems = problems.filter((p) => p.type === "coding");
   const sortedProblems = [...mcqProblems, ...codingProblems];
 
   const currentIndex = sortedProblems.findIndex((p) => String(p.id) === String(problem._id || problem.id));

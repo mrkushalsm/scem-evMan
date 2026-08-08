@@ -1,6 +1,5 @@
 const Contest = require('../models/Contest');
 const User = require('../models/User');
-const { jwtVerify } = require('jose');
 
 //PERMISSION CHECK (isContestActive)
 const isContestActive = async (req, res, next) => {

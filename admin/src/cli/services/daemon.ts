@@ -1,6 +1,6 @@
-import { existsSync } from "fs";
-import { API_BASE, DEFAULT_DAEMON_BIN } from "../core/config";
+import { API_BASE, APP_ROOT } from "../core/config";
 import { exitWithError, logInfo } from "../core/logging";
+import { resolveDaemonBinary } from "../../daemon/core/dev";
 
 export async function ensureDaemon() {
   try {
@@ -15,9 +15,10 @@ export async function startDaemon() {
     logInfo("pomelod is already running");
     return;
   }
-  const daemonBin = process.env.POMELO_DAEMON_BIN ?? DEFAULT_DAEMON_BIN;
-  if (!existsSync(daemonBin)) {
-    exitWithError(`Daemon binary not found at ${daemonBin}`, 1);
+  const daemonBin = resolveDaemonBinary(APP_ROOT);
+  if (!daemonBin) {
+    exitWithError(`Daemon binary not found. Build it with 'pnpm --filter @pomelo/admin build:cli' or set POMELO_DAEMON_BIN.`, 1);
+    return;
   }
   logInfo("Starting daemon...");
   Bun.spawn({

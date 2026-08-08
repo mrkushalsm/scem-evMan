@@ -141,7 +141,7 @@ export default function Layout() {
   const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
-    api.getStatus().then(setStatus).catch(() => {});
+    api.getStatus().then(setStatus).catch(() => { });
   }, []);
 
   const pageTitle = ROUTE_TITLES[location.pathname] ?? "Pomelo";
@@ -173,10 +173,9 @@ export default function Layout() {
                     to={item.to}
                     end={item.to === "/"}
                     className={({ isActive }) =>
-                      `flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                        isActive
-                          ? "bg-sidebar-accent text-white"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-white"
+                      `flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm transition-colors ${isActive
+                        ? "bg-sidebar-accent text-white"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-white"
                       }`
                     }
                   >
@@ -210,6 +209,12 @@ export default function Layout() {
             <h2 className="text-xl font-semibold tracking-tight">{pageTitle}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Deployment control plane</p>
           </div>
+          {status?.isDev && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium tracking-tight">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              Development Mode
+            </div>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto px-8 pt-6 pb-20">

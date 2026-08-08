@@ -33,6 +33,17 @@ const contestSchema = new mongoose.Schema({
     default: [],
   },
 
+  status: {
+    type: String,
+    enum: ['upcoming', 'ongoing', 'completed', 'ended'],
+  },
+
+  violations: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    timestamp: { type: Date, default: Date.now },
+    details: String,
+  }],
+
 }, { timestamps: true });
 
 module.exports = mongoose.models.Contest || mongoose.model('Contest', contestSchema);

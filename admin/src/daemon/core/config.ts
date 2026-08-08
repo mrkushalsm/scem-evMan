@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { randomBytes } from "crypto";
 import YAML from "yaml";
 import type { Paths } from "./types";
 
@@ -221,11 +222,5 @@ export function defaultCaddyfile() {
 }
 
 function genSecret(length = 32) {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return randomBytes(length).toString("base64url").slice(0, length);
 }
