@@ -1,3 +1,8 @@
+// stdbuf line-buffers piped output on Linux only; passthrough elsewhere (macOS/Windows lack coreutils)
+export function withLineBuffering(cmd: string[]): string[] {
+  return process.platform === "linux" ? ["stdbuf", "-oL", "-eL", ...cmd] : cmd;
+}
+
 export async function run(
   cmd: string,
   args: string[],

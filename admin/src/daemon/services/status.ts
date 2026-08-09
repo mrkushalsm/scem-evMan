@@ -1,10 +1,9 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync, lstatSync } from "fs";
 import { join } from "path";
 import { dockerAvailable, runCompose } from "./compose";
 import { ComposeCommand } from "./compose-command";
 import { getOperationState } from "./operations";
 import { isDevMode } from "../core/dev";
-import { run } from "../core/run";
 import type { Paths } from "../core/types";
 
 export async function getStatus(paths: Paths) {
@@ -72,9 +71,19 @@ export async function getStorageUsage(paths: Paths) {
 
 async function diskUsage(path: string) {
   if (!existsSync(path)) return { bytes: 0 };
-  const res = await run("du", ["-sk", path]);
-  if (res.code !== 0 || !res.stdout.trim()) return { bytes: 0 };
-  const sizeKb = Number(res.stdout.trim().split(/\s+/)[0]);
-  if (isNaN(sizeKb)) return { bytes: 0 };
-  return { bytes: sizeKb * 1024 };
+  return { bytes: dirSize(path) };
+}
+
+// Recursive fs-based dir size (cross-platform; lstat avoids following symlinks)
+function dirSize(path: string): number {
+  const stat = lstatSync(path);
+  if (!stat.isDirectory()) return stat.size;
+
+  let total = 0;
+  for (const entry of readdirSync(path)) {
+    try {
+      total += dirSize(join(path, entry));
+    } catch {}
+  }
+  return total;
 }

@@ -8,7 +8,7 @@ import {
 } from "./operations";
 import { ComposeCommand } from "./compose-command";
 import type { CommandDescriptor } from "./compose-command";
-import { run } from "../core/run";
+import { run, withLineBuffering } from "../core/run";
 import type { Paths } from "../core/types";
 
 export async function dockerAvailable() {
@@ -78,7 +78,7 @@ export async function startCompose(
         if (step.label) appendOperationLog(`\n${step.label}\n`);
 
         const proc = Bun.spawn({
-          cmd: ["stdbuf", "-oL", "-eL", ...step.descriptor.cmd],
+          cmd: withLineBuffering(step.descriptor.cmd),
           cwd: step.descriptor.cwd,
           stdout: "pipe",
           stderr: "pipe",

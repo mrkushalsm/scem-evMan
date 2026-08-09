@@ -3,7 +3,7 @@ import { join } from "path";
 import { ComposeCommand } from "./compose-command";
 import { readStream } from "./compose";
 import { getCurrentReleaseDir } from "../core/release";
-import { run } from "../core/run";
+import { run, withLineBuffering } from "../core/run";
 import type { Paths } from "../core/types";
 import {
   isOperationRunning,
@@ -25,7 +25,7 @@ export async function startUninstall(paths: Paths, mode = "default") {
     appendOperationLog("Stopping Docker services...\n");
     const desc = ComposeCommand.forTeardown(paths).down();
     const proc = Bun.spawn({
-      cmd: ["stdbuf", "-oL", "-eL", ...desc.cmd],
+      cmd: withLineBuffering(desc.cmd),
       cwd: desc.cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -43,33 +43,38 @@ export async function startUninstall(paths: Paths, mode = "default") {
 
   // Schedule daemon self-shutdown
   setTimeout(() => {
-    run("systemctl", ["stop", "pomelod"]).catch(() => {}).finally(() => {
-      process.exit(0);
-    });
+    (process.platform === "linux" ? run("systemctl", ["stop", "pomelod"]) : Promise.resolve())
+      .catch(() => {})
+      .finally(() => {
+        process.exit(0);
+      });
   }, 1000);
 }
 
+// systemd/symlink cleanup is Linux production-only; skipped on dev/Windows/macOS
 async function finishUninstall(
   paths: Paths,
   mode: string,
 ) {
-  const serviceFile = "/etc/systemd/system/pomelod.service";
-  try {
-    appendOperationLog("Disabling systemd service...\n");
-    await run("systemctl", ["disable", "pomelod"]);
-    if (existsSync(serviceFile)) {
-      unlinkSync(serviceFile);
-    }
-    await run("systemctl", ["daemon-reload"]);
-  } catch {}
+  if (process.platform === "linux") {
+    const serviceFile = "/etc/systemd/system/pomelod.service";
+    try {
+      appendOperationLog("Disabling systemd service...\n");
+      await run("systemctl", ["disable", "pomelod"]);
+      if (existsSync(serviceFile)) {
+        unlinkSync(serviceFile);
+      }
+      await run("systemctl", ["daemon-reload"]);
+    } catch {}
 
-  const cliSymlink = "/usr/local/bin/pomelo";
-  try {
-    if (existsSync(cliSymlink)) {
-      appendOperationLog("Removing CLI symlink...\n");
-      unlinkSync(cliSymlink);
-    }
-  } catch {}
+    const cliSymlink = "/usr/local/bin/pomelo";
+    try {
+      if (existsSync(cliSymlink)) {
+        appendOperationLog("Removing CLI symlink...\n");
+        unlinkSync(cliSymlink);
+      }
+    } catch {}
+  }
 
   try {
     appendOperationLog("Removing application files...\n");
