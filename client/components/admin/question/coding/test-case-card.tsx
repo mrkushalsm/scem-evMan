@@ -150,7 +150,7 @@ export default function TestCaseCard() {
                     rowData[h] = values[idx] || '';
                 });
 
-                const inputData: Record<string, any> = {};
+                const inputData: Record<string, string | string[]> = {};
                 inputVariables.forEach((v: {variable: string; type: string}) => {
                     const raw = rowData[v.variable] || '';
                     inputData[v.variable] = v.type.includes("_array")
