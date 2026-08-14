@@ -47,6 +47,7 @@ const codingSchema = z.object({
       z.object({
         input: z.any(),
         output: z.string().min(1, "Expected output is required"),
+        explanation: z.string().optional(),
         isVisible: z.boolean().default(false),
       })
     )

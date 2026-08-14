@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Question = require('../models/Question');
 const { languageMap } = require('../utils/languageMap');
 const { getJudge } = require('@pomelo/code-gen');
+const { formatTestCaseInput } = require('../utils/formatTestCaseInput');
 
 // @desc    Validate 6-digit Join ID (OTP)
 // @route   POST /api/contest/validate
@@ -183,7 +184,15 @@ const getContestData = async (req, res, next) => {
                     marks: q.marks,
                     savedAnswer: answerMap[q._id.toString()] ? answerMap[q._id.toString()].answer : undefined,
                     savedCode: answerMap[q._id.toString()] ? answerMap[q._id.toString()].code : undefined,
-                    savedLanguage: answerMap[q._id.toString()] ? answerMap[q._id.toString()].language : undefined
+                    savedLanguage: answerMap[q._id.toString()] ? answerMap[q._id.toString()].language : undefined,
+                    examples: (q.testcases || [])
+                        .filter(tc => tc.isVisible)
+                        .slice(0, 3)
+                        .map(tc => ({
+                            input: formatTestCaseInput(tc.input, q.inputVariables),
+                            output: tc.output,
+                            explanation: tc.explanation || undefined,
+                        })),
                 }))
             }
         });
