@@ -7,7 +7,6 @@ import {
   FaChartLine,
   FaQuestionCircle,
   FaClipboardList,
-  FaCogs,
 } from "react-icons/fa";
 
 export default function AdminSidebar() {
@@ -32,12 +31,6 @@ export default function AdminSidebar() {
       link: "/admin/questions",
       icon: <FaClipboardList />,
       label: "Questions",
-    },
-    {
-      name: "settings",
-      link: "/admin/settings",
-      icon: <FaCogs />,
-      label: "Settings",
     },
   ];
 

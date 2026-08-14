@@ -15,7 +15,6 @@ export async function deleteQuestion(id: string) {
 
         revalidatePath("/admin");
         revalidatePath("/admin/questions");
-        revalidatePath("/admin/settings");
 
         return { success: true, message: "Question deleted successfully" };
     } catch (error) {
