@@ -29,6 +29,7 @@ const inputVariableSchema = z.object({
 const testCaseSchema = z.object({
   input: z.string().min(1, "Input is required"),
   output: z.string(),
+  explanation: z.string().optional(),
   isVisible: z.boolean().optional().default(false),
 });
 

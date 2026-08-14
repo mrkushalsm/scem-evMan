@@ -42,6 +42,7 @@ const questionSchema = new mongoose.Schema({
   testcases: [{
     input: String,
     output: String,
+    explanation: String,
     isVisible: {
       type: Boolean,
       default: false

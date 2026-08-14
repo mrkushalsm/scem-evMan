@@ -22,7 +22,7 @@ export async function saveQuestion(_prevState: Record<string, unknown>, data: Qu
       // Coding specific
       inputFormat: validatedData.type === 'coding' ? validatedData.inputFormat : undefined,
       outputFormat: validatedData.type === 'coding' ? validatedData.outputFormat : undefined,
-      constraints: validatedData.type === 'coding' ? String(validatedData.constraints) : undefined, // Expecting String
+      constraints: validatedData.type === 'coding' ? validatedData.constraints.join('\n') : undefined, // Expecting String, newline per constraint
       boilerplateCode: validatedData.type === 'coding' ? validatedData.boilerplate : undefined, // Map boilerplate -> boilerplateCode
       functionName: validatedData.type === 'coding' ? validatedData.functionName : undefined,
       inputVariables: validatedData.type === 'coding' ? validatedData.inputVariables : undefined,

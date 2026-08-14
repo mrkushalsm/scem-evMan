@@ -25,7 +25,7 @@
         { "variable": "target", "type": "int" }
       ],
       "testcases": [
-        { "input": "4 9\n2 7 11 15", "output": "0 1", "isVisible": true }
+        { "input": "4 9\n2 7 11 15", "output": "0 1", "isVisible": true, "explanation": "nums[0] + nums[1] = 2 + 7 = 9, so the answer is [0, 1]." }
       ]
     }
   ],
