@@ -23,6 +23,11 @@ export interface CodingProblem extends BaseProblem {
     python?: string;
     javascript?: string;
   };
+  examples?: {
+    input: string;
+    output: string;
+    explanation?: string;
+  }[];
 }
 
 export interface MCQProblem extends BaseProblem {

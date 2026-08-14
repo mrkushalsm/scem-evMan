@@ -54,10 +54,52 @@ export default function DescriptionPanel({
           </div>
 
           {problem.constraints && (
-            <div>
-              <Label className="text-muted-foreground">Constraints</Label>
-              <p className="whitespace-pre-wrap">{problem.constraints}</p>
-            </div>
+            <>
+              <Separator />
+              <div>
+                <Label className="text-muted-foreground pb-2 block">Constraints</Label>
+                <ul className="list-disc pl-5">
+                  {problem.constraints.split(/\n|,/).map(s => s.trim()).filter(Boolean).map((constraint, index) => (
+                    <li key={index} className="whitespace-pre-wrap">{constraint}</li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {problem.examples && problem.examples.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <Label className="text-muted-foreground">Examples</Label>
+                {problem.examples.map((example, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && <Separator />}
+                    <div className="space-y-2 text-sm">
+                      <p className="font-medium">Example {index + 1}:</p>
+                      <div>
+                        <span className="text-muted-foreground block">Input:</span>
+                        <code className="rounded-md border bg-muted/30 px-2 py-1 font-mono whitespace-pre-wrap inline-block mt-1">
+                          {example.input}
+                        </code>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Output:</span>
+                        <code className="rounded-md border bg-muted/30 px-2 py-1 font-mono whitespace-pre-wrap inline-block mt-1">
+                          {example.output}
+                        </code>
+                      </div>
+                      {example.explanation && (
+                        <div>
+                          <span className="text-muted-foreground block">Explanation:</span>
+                          <p className="whitespace-pre-wrap mt-1">{example.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </ScrollArea>
