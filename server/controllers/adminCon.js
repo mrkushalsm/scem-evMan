@@ -3,6 +3,13 @@ const Contest = require('../models/Contest');
 const Submission = require('../models/Submissions');
 const { connectDB } = require('../helpers/dbCon');
 const { getJudge } = require("@pomelo/code-gen");
+const {
+  exportSingleQuestion,
+  exportBulkQuestions,
+  exportPayloadToJSON,
+  generateExportFilename,
+  processImportJSON,
+} = require("../utils/questionsIO");
 
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 const toNumber = (value) => {
@@ -724,144 +731,92 @@ const getAdminStats = async (req, res, next) => {
     }
 };
 
-// @desc Import questions from CSV
+// @desc Export a single question or multiple questions as JSON
+const exportQuestion = async (req, res, next) => {
+    try {
+        await connectDB();
+        const { id } = req.params;
+        const { bulk } = req.query; // ?bulk=true to export multiple
+
+        try {
+            if (bulk === 'true') {
+                // Export all questions
+                const questions = await Question.find().lean();
+                if (questions.length === 0) {
+                    return res.status(404).json({ success: false, error: 'No questions found' });
+                }
+
+                const payload = exportBulkQuestions(questions);
+                const jsonString = exportPayloadToJSON(payload, true);
+                const filename = generateExportFilename(undefined, questions.length);
+
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                return res.status(200).send(jsonString);
+            } else {
+                // Export single question
+                const question = await Question.findById(id).lean();
+                if (!question) {
+                    return res.status(404).json({ success: false, error: 'Question not found' });
+                }
+
+                const exportedQuestion = exportSingleQuestion(question);
+                const payload = exportBulkQuestions([question]); // Wrap in bulk format for consistency
+                const jsonString = exportPayloadToJSON(payload, true);
+                const filename = generateExportFilename(question.title, 1);
+
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                return res.status(200).send(jsonString);
+            }
+        } catch (exportError) {
+            return res.status(500).json({
+                success: false,
+                error: 'Failed to export question',
+                details: exportError.message
+            });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc Import questions from JSON
 const importQuestions = async (req, res, next) => {
     try {
         await connectDB();
-        const { type } = req.params; // 'mcq' or 'coding'
 
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });
         }
 
-        if (!['mcq', 'coding'].includes(type)) {
-            return res.status(400).json({ success: false, error: 'Invalid question type. Must be "mcq" or "coding"' });
-        }
+        const fileContent = req.file.buffer.toString('utf-8');
 
-        const { parse } = require('csv-parse/sync');
-        const csvContent = req.file.buffer.toString('utf-8');
+        const result = processImportJSON(fileContent);
 
-        let records;
-        try {
-            records = parse(csvContent, {
-                columns: true,
-                skip_empty_lines: true,
-                trim: true,
+        if (!result.valid) {
+            const errorMessages = result.errors
+                .map(e => `${e.field ? `Field "${e.field}"` : ''}: ${e.message}`)
+                .join('; ');
+            return res.status(400).json({
+                success: false,
+                error: `JSON validation failed: ${errorMessages}`,
+                errors: result.errors
             });
-        } catch (parseError) {
-            return res.status(400).json({ success: false, error: `CSV parsing failed: ${parseError.message}` });
         }
 
-        if (!records.length) {
-            return res.status(400).json({ success: false, error: 'CSV file is empty' });
-        }
-
-        const errors = [];
-        const questionsToInsert = [];
-
-        for (let i = 0; i < records.length; i++) {
-            const row = records[i];
-            const rowNum = i + 2; // +2 for header row and 1-indexing
-
-            try {
-                if (type === 'mcq') {
-                    // Validate MCQ required fields
-                    if (!row.title || !row.description || !row.difficulty || !row.marks || !row.questionType || !row.options || !row.correctAnswer) {
-                        errors.push({ row: rowNum, error: 'Missing required fields' });
-                        continue;
-                    }
-
-                    let options;
-                    try {
-                        options = JSON.parse(row.options);
-                    } catch {
-                        errors.push({ row: rowNum, error: 'Invalid JSON in options field' });
-                        continue;
-                    }
-
-                    questionsToInsert.push({
-                        type: 'mcq',
-                        title: row.title,
-                        description: row.description,
-                        difficulty: row.difficulty,
-                        marks: parseInt(row.marks, 10),
-                        questionType: row.questionType,
-                        options,
-                        correctAnswer: row.correctAnswer,
-                    });
-                } else {
-                    // Validate Coding required fields
-                    if (!row.title || !row.description || !row.difficulty || !row.marks || !row.functionName || !row.inputVariables) {
-                        errors.push({ row: rowNum, error: 'Missing required fields' });
-                        continue;
-                    }
-
-                    let inputVariables, testcases;
-                    try {
-                        inputVariables = JSON.parse(row.inputVariables);
-                    } catch {
-                        errors.push({ row: rowNum, error: 'Invalid JSON in inputVariables field' });
-                        continue;
-                    }
-
-                    try {
-                        testcases = row.testcases ? JSON.parse(row.testcases) : [];
-                    } catch {
-                        errors.push({ row: rowNum, error: 'Invalid JSON in testcases field' });
-                        continue;
-                    }
-
-                    // Auto-generate boilerplate code
-                    const boilerplateCode = {};
-                    const supportedLangs = ['c', 'java', 'python'];
-                    const inputs = inputVariables.map(v => ({
-                        variable: v.variable,
-                        type: v.type
-                    }));
-
-                    supportedLangs.forEach(lang => {
-                        try {
-                            const judge = getJudge(lang);
-                            boilerplateCode[lang] = judge.generateBoilerplate({
-                                method: row.functionName,
-                                input: inputs
-                            });
-                        } catch (err) {
-                            console.warn(`Skipping boilerplate for ${lang}: ${err.message}`);
-                        }
-                    });
-
-                    questionsToInsert.push({
-                        type: 'coding',
-                        title: row.title,
-                        description: row.description,
-                        difficulty: row.difficulty,
-                        marks: parseInt(row.marks, 10),
-                        constraints: row.constraints || '',
-                        inputFormat: row.inputFormat || '',
-                        outputFormat: row.outputFormat || '',
-                        functionName: row.functionName,
-                        inputVariables,
-                        testcases,
-                        boilerplateCode,
-                    });
-                }
-            } catch (rowError) {
-                errors.push({ row: rowNum, error: rowError.message });
-            }
-        }
-
+        // Insert validated questions
         let imported = 0;
-        if (questionsToInsert.length > 0) {
-            const result = await Question.insertMany(questionsToInsert);
-            imported = result.length;
+        if (result.queries && result.queries.length > 0) {
+            const insertResult = await Question.insertMany(result.queries);
+            imported = insertResult.length;
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             imported,
-            total: records.length,
-            errors: errors.length > 0 ? errors : undefined,
+            total: result.queries ? result.queries.length : 0,
+            errors: result.errors.length > 0 ? result.errors : undefined,
         });
     } catch (error) {
         next(error);
@@ -907,6 +862,7 @@ module.exports = {
     deleteContest,
     getAdminStats,
     importQuestions,
+    exportQuestion,
     getAdminSubmissionDetail,
     exportContestResults
 };

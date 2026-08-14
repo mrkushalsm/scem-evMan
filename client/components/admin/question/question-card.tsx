@@ -2,7 +2,7 @@
 // forcing revalidation
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Code, HelpCircle, Pencil, Trash2 } from "lucide-react";
+import { Code, HelpCircle, Pencil, Trash2, Download } from "lucide-react";
 import { BaseProblem } from "@/types/problem/problem.types";
 import React from "react";
 import Link from "next/link";
@@ -54,6 +54,34 @@ export default function QuestionCard({
     if (onClickQuestion) onClickQuestion(problem._id || problem.id);
   };
 
+  const handleExport = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(
+        `/api/admin/questions/${problem._id || problem.id}/export`,
+        {
+          method: "GET",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to export question");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `question-${problem.title?.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert("Failed to export question");
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -84,6 +112,15 @@ export default function QuestionCard({
 
       {!hideActions && (
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={handleExport}
+            title="Export as JSON"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
             <Link
               href={`/admin/questions/${(problem.type || "coding").toLowerCase()}/${problem._id || problem.id}/edit`}
