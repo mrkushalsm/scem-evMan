@@ -3,7 +3,7 @@ import { CodeScreen } from "@/components/attempt/code";
 import React from "react";
 import { CodingProblem, MCQProblem, Problem } from "@/types/problem";
 import MCQScreen from "@/components/attempt/mcq";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getBaseUrl } from "@/lib/env";
 
 interface Props {
@@ -31,14 +31,14 @@ export default async function TestContentPage(props: Props) {
 
   const result = await res.json();
   if (!result.success) {
-    return notFound();
+    redirect(`/test/${testid}`);
   }
 
   const allProblems = (result.data?.problems || []) as Problem[];
   const currentProblem = allProblems.find(p => String(p.id) === qid);
 
   if (!currentProblem) {
-    return notFound();
+    redirect(`/test/${testid}`);
   }
 
   return (

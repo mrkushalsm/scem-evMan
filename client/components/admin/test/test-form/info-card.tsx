@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ChevronDownIcon, FileText } from "lucide-react";
+import { ChevronDownIcon, FileText, Hourglass } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -70,13 +70,20 @@ export default function TestBasicCard() {
   const { control, setValue, watch } = useFormContext();
 
   const startsAt = watch("startsAt");
-  const duration = watch("duration");
+  const endsAtTime = watch("endsAtTime");
   const endsAt = watch("endsAt");
+  const durationMinutes = watch("durationMinutes");
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [time, setTime] = useState("12:00 AM");
   const endsAtInitialized = useRef(false);
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Resolved client-side only — the server's ICU data can report a different
+  // (sometimes outdated-alias) name for the same zone than the browser does,
+  // which causes a hydration mismatch if read during SSR.
+  const [userTimezone, setUserTimezone] = useState<string | null>(null);
+  useEffect(() => {
+    setUserTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }, []);
 
   useEffect(() => {
     if (startsAt) {
@@ -103,22 +110,22 @@ export default function TestBasicCard() {
     }
   }, [date, time, setValue]);
 
-  // On edit: initialize the "Ends At" display from the stored UTC endsAt
+  // On edit: initialize the "Join Window Closes At" display from the stored UTC endsAt
   useEffect(() => {
     if (!endsAtInitialized.current && endsAt) {
       endsAtInitialized.current = true;
       const parsed = new Date(endsAt);
       if (!isNaN(parsed.getTime())) {
-        setValue("duration", formatTimeForInput(parsed));
+        setValue("endsAtTime", formatTimeForInput(parsed));
       }
     }
   }, [endsAt, setValue]);
 
-  // Recompute endsAt (UTC ISO) whenever the end time input or start date changes
+  // Recompute endsAt (UTC ISO) whenever the join-window close time or start date changes
   useEffect(() => {
-    if (date && duration) {
+    if (date && endsAtTime) {
       endsAtInitialized.current = true;
-      const parsedTime = parseTimeInput(duration);
+      const parsedTime = parseTimeInput(endsAtTime);
       if (!parsedTime) return;
       const endDate = new Date(date);
       endDate.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
@@ -127,7 +134,18 @@ export default function TestBasicCard() {
       }
       setValue("endsAt", endDate.toISOString());
     }
-  }, [date, duration, startsAt, setValue]);
+  }, [date, endsAtTime, startsAt, setValue]);
+
+  const durationPreview = (() => {
+    const total = Number(durationMinutes);
+    if (!Number.isFinite(total) || total <= 0) return null;
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    return parts.join(" ") || "0m";
+  })();
 
   return (
     <Card>
@@ -172,66 +190,112 @@ export default function TestBasicCard() {
         <p className="text-xs text-muted-foreground">
           All times are in your local timezone: <span className="font-medium">{userTimezone}</span>
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+          <div>
+            <h4 className="text-sm font-semibold">Join Window</h4>
+            <p className="text-xs text-muted-foreground">
+              Participants can start their attempt any time in this window.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Opens At</Label>
+              <div className="flex space-x-2">
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-32 justify-between font-normal bg-background"
+                    >
+                      {date ? date.toLocaleDateString() : "Select date"}
+                      <ChevronDownIcon className="ml-2 h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      captionLayout="dropdown"
+                      disabled={(day) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        return day < today;
+                      }}
+                      onSelect={(d) => {
+                        setDate(d);
+                        setOpen(false);
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Input
+                  type="text"
+                  value={time}
+                  onChange={(e) => setTime(normalizeTimeInput(e.target.value))}
+                  placeholder="hh:mm AM"
+                  className="w-fit bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+                />
+              </div>
+            </div>
+
+            <FormField
+              control={control}
+              name="endsAtTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Closes At (HH:MM AM/PM)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(normalizeTimeInput(e.target.value))}
+                      placeholder="01:30 PM"
+                      className="w-fit bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+          <div>
+            <h4 className="text-sm font-semibold">Attempt Duration</h4>
+            <p className="text-xs text-muted-foreground">
+              How long each participant gets, starting from the moment they personally begin.
+            </p>
+          </div>
           <FormField
             control={control}
-            name="duration"
+            name="durationMinutes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Ends At (HH:MM AM/PM)</FormLabel>
+                <FormLabel className="sr-only">Duration (minutes)</FormLabel>
                 <FormControl>
-                  <Input
-                    type="text"
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(normalizeTimeInput(e.target.value))}
-                    placeholder="01:30 PM"
-                    className="w-fit bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
-                  />
+                  <div className="flex items-center gap-2">
+                    <Hourglass className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                      placeholder="60"
+                      className="w-28 bg-background"
+                    />
+                    <span className="text-sm text-muted-foreground">minutes</span>
+                    {durationPreview && (
+                      <span className="text-xs text-muted-foreground">≈ {durationPreview}</span>
+                    )}
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-
-          <div className="space-y-2">
-            <Label>Starts At</Label>
-            <div className="flex space-x-2">
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-32 justify-between font-normal"
-                  >
-                    {date ? date.toLocaleDateString() : "Select date"}
-                    <ChevronDownIcon className="ml-2 h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    captionLayout="dropdown"
-                    disabled={(day) => {
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return day < today;
-                    }}
-                    onSelect={(d) => {
-                      setDate(d);
-                      setOpen(false);
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-              <Input
-                type="text"
-                value={time}
-                onChange={(e) => setTime(normalizeTimeInput(e.target.value))}
-                placeholder="hh:mm AM"
-                className="w-fit bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden"
-              />
-            </div>
-          </div>
         </div>
         {/* Hidden fields to ensure computed values are passed */}
         <FormField

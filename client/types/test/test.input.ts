@@ -10,12 +10,16 @@ export const testSchema = z.object({
   id: z.string().optional(),
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  duration: z
+  endsAtTime: z
     .string()
     .regex(
       /^(0?[1-9]|1[0-2]):[0-5]\d\s?(AM|PM)$/i,
-      "End time must be in HH:MM AM/PM format",
+      "Join window close time must be in HH:MM AM/PM format",
     ),
+  durationMinutes: z
+    .number()
+    .int()
+    .positive("Duration must be a positive number of minutes"),
   startsAt: z.iso.datetime(),
   endsAt: z.iso.datetime(),
   problems: z.array(z.string()),

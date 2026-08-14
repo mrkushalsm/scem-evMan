@@ -53,10 +53,12 @@ export default async function TestLayout({
     type: q.type
   }));
 
+  const initialTimeRemaining = Number(result.data?.timeRemaining) || 0;
+
   return (
     <main className="w-screen h-screen pt-12">
       <IntegrityMonitor />
-      <TestHeader problems={problemMeta} />
+      <TestHeader problems={problemMeta} initialTimeRemaining={initialTimeRemaining} />
       {children}
     </main>
   );

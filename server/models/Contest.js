@@ -19,6 +19,11 @@ const contestSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  durationMinutes: {
+    type: Number,
+    required: true,
+    min: 1,
+  },
 
   questions: [{
     type: mongoose.Schema.Types.ObjectId,

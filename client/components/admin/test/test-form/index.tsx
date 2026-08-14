@@ -33,8 +33,9 @@ function getDefaultSchedule() {
 
   return {
     startsAt: start.toISOString(),
-    duration: formatTimeForDisplay(end),
+    endsAtTime: formatTimeForDisplay(end),
     endsAt: end.toISOString(),
+    durationMinutes: 60,
   };
 }
 
@@ -47,8 +48,9 @@ export default function TestForm({ testData, availableQuestions = [] }: { testDa
       title: "",
       description: "",
       startsAt: defaultSchedule.startsAt,
-      duration: defaultSchedule.duration,
+      endsAtTime: defaultSchedule.endsAtTime,
       endsAt: defaultSchedule.endsAt,
+      durationMinutes: defaultSchedule.durationMinutes,
       status: "waiting",
       problems: [],
       rules: [],

@@ -23,6 +23,7 @@ export interface MongoTestContent {
   joinId?: string;
   createdAt?: string;
   duration?: string;
+  durationMinutes?: number;
 }
 
 interface Props {
@@ -34,12 +35,9 @@ export function TestsList({ initialTests }: Props) {
 
   // Map mongo objects to the shape TestCard expects.
   const tests = [...initialTests].reverse().map(t => {
-    const start = t.startTime ? new Date(t.startTime).getTime() : 0;
-    const end = t.endTime ? new Date(t.endTime).getTime() : 0;
-    const durationMs = end - start;
-
-    const minutes = Math.floor((durationMs / (1000 * 60)) % 60);
-    const hours = Math.floor((durationMs / (1000 * 60 * 60)));
+    const totalMinutes = t.durationMinutes || 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
 
     let durationStr = "";
     if (hours > 0) durationStr += `${hours}h `;

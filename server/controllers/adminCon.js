@@ -273,23 +273,21 @@ const getAdminContests = async (req, res, next) => {
     try {
         await connectDB();
         // Return summary fields
-        const contests = await Contest.find().select('title description createdAt questions author startTime endTime joinId');
+        const contests = await Contest.find().select('title description createdAt questions author startTime endTime durationMinutes joinId');
         const now = new Date();
 
         const summary = await Promise.all(contests.map(async c => {
             const start = new Date(c.startTime);
             const end = new Date(c.endTime);
-            const durationMs = end - start;
 
-            const seconds = Math.floor((durationMs / 1000) % 60);
-            const minutes = Math.floor((durationMs / (1000 * 60)) % 60);
-            const hours = Math.floor((durationMs / (1000 * 60 * 60)));
+            const totalMinutes = c.durationMinutes || 0;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
 
             let durationStr = "";
             if (hours > 0) durationStr += `${hours}h `;
             if (minutes > 0) durationStr += `${minutes}m `;
-            if (seconds > 0) durationStr += `${seconds}s`;
-            if (!durationStr) durationStr = "0s";
+            if (!durationStr) durationStr = "0m";
 
             // Count submissions for this contest
             const contestSubmissions = await Submission.find({ contest: c._id }).select('status');
@@ -355,7 +353,7 @@ const getAdminContestDetail = async (req, res, next) => {
 const createContest = async (req, res, next) => {
     try {
         await connectDB();
-        const { title, description, duration, problemIds, rules, author } = req.body;
+        const { title, description, duration, durationMinutes, problemIds, rules, author } = req.body;
 
         if (!isNonEmptyString(title)) {
             return res.status(400).json({ success: false, error: 'Title is required' });
@@ -365,11 +363,16 @@ const createContest = async (req, res, next) => {
             return res.status(400).json({ success: false, error: 'Duration with start and end is required' });
         }
 
+        const durationMinutesNum = toNumber(durationMinutes);
+        if (!durationMinutesNum || durationMinutesNum < 1) {
+            return res.status(400).json({ success: false, error: 'durationMinutes is required and must be a positive number' });
+        }
+
         if (problemIds !== undefined && !Array.isArray(problemIds)) {
             return res.status(400).json({ success: false, error: 'problemIds must be an array' });
         }
 
-        // duration is { start, end }
+        // duration is { start, end } — the join window, not the per-user attempt length
         const startTime = new Date(duration.start);
         const endTime = new Date(duration.end);
 
@@ -390,6 +393,7 @@ const createContest = async (req, res, next) => {
             try {
                 newContest = new Contest({
                     title, description, startTime, endTime,
+                    durationMinutes: durationMinutesNum,
                     questions: problemIds,
                     rules,
                     joinId,
@@ -434,6 +438,7 @@ const cloneContest = async (req, res, next) => {
                     description: originalContest.description,
                     startTime,
                     endTime,
+                    durationMinutes: originalContest.durationMinutes,
                     questions: originalContest.questions,
                     rules: originalContest.rules,
                     joinId,
@@ -458,7 +463,7 @@ const updateContest = async (req, res, next) => {
     try {
         await connectDB();
         const { id } = req.params;
-        const { title, description, duration, problemIds, rules, visibility } = req.body;
+        const { title, description, duration, durationMinutes, problemIds, rules, visibility } = req.body;
 
         if (title !== undefined && !isNonEmptyString(title)) {
             return res.status(400).json({ success: false, error: 'Title cannot be empty' });
@@ -468,11 +473,22 @@ const updateContest = async (req, res, next) => {
             return res.status(400).json({ success: false, error: 'Duration must include start and end' });
         }
 
+        let durationMinutesNum;
+        if (durationMinutes !== undefined) {
+            durationMinutesNum = toNumber(durationMinutes);
+            if (!durationMinutesNum || durationMinutesNum < 1) {
+                return res.status(400).json({ success: false, error: 'durationMinutes must be a positive number' });
+            }
+        }
+
         if (problemIds !== undefined && !Array.isArray(problemIds)) {
             return res.status(400).json({ success: false, error: 'problemIds must be an array' });
         }
 
         const updates = { title, description, rules, visibility };
+        if (durationMinutesNum !== undefined) {
+            updates.durationMinutes = durationMinutesNum;
+        }
         if (duration) {
             updates.startTime = new Date(duration.start);
             updates.endTime = new Date(duration.end);
@@ -641,11 +657,13 @@ const deleteContest = async (req, res, next) => {
             return res.status(400).json({ success: false, error: 'Cannot delete an ongoing contest' });
         }
 
-        // Double check time (in case cron/status is stale)
+        // Double check time (in case cron/status is stale). A late joiner's
+        // personal deadline can run past endTime, so guard up to the last
+        // possible deadline, not just the join window's endTime.
         const now = new Date();
         const start = new Date(contest.startTime);
-        const end = new Date(contest.endTime);
-        const isRunning = now >= start && now <= end;
+        const lastPossibleDeadline = new Date(new Date(contest.endTime).getTime() + (contest.durationMinutes || 0) * 60000);
+        const isRunning = now >= start && now <= lastPossibleDeadline;
 
         if (isRunning) {
             return res.status(400).json({ success: false, error: 'Cannot delete a contest that is currently active (Time-based protection).' });
@@ -676,7 +694,10 @@ const getAdminStats = async (req, res, next) => {
             recentTestsData,
             questionBankData
         ] = await Promise.all([
-            Contest.countDocuments({ startTime: { $lte: now }, endTime: { $gte: now } }),
+            Contest.countDocuments({
+                startTime: { $lte: now },
+                $expr: { $gte: [{ $add: ["$endTime", { $multiply: [{ $ifNull: ["$durationMinutes", 0] }, 60000] }] }, now] }
+            }),
             Question.countDocuments({}),
             Contest.countDocuments({ startTime: { $gt: now } }),
             Submission.countDocuments({}),

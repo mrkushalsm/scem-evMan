@@ -37,12 +37,11 @@ export default async function AdminTestDetailPage({
       const endTime = data.endTime as string;
       const start = new Date(startTime);
       const end = new Date(endTime);
-      const diffMs = end.getTime() - start.getTime();
-      const totalSeconds = Math.floor(diffMs / 1000);
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
+      const durationMinutes = (data.durationMinutes as number) || 0;
+      const h = Math.floor(durationMinutes / 60);
+      const m = durationMinutes % 60;
 
-      // Dynamic stats 
+      // Dynamic stats
       const now = new Date();
       let computedStatus: "waiting" | "ongoing" | "completed" = "waiting";
       

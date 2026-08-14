@@ -118,7 +118,7 @@ const getContestLanding = async (req, res, next) => {
             data: {
                 title: contest.title,
                 description: contest.description,
-                duration: contest.duration || (new Date(contest.endTime) - new Date(contest.startTime)) / 60000, // min
+                duration: contest.durationMinutes, // min
                 startTime: contest.startTime,
                 endTime: contest.endTime,
                 serverTime: now,
@@ -161,7 +161,10 @@ const getContestData = async (req, res, next) => {
             });
         }
 
-        const timeRemaining = Math.max(0, (new Date(contest.endTime) - new Date()) / 1000);
+        const deadline = submission
+            ? new Date(submission.startedAt.getTime() + (contest.durationMinutes || 0) * 60000)
+            : new Date(contest.endTime);
+        const timeRemaining = Math.max(0, (deadline - new Date()) / 1000);
 
         return res.json({
             success: true,
@@ -240,13 +243,15 @@ const startTest = async (req, res, next) => {
             console.log("StartTest: Resuming existing submission:", submission._id);
         }
 
+        const deadline = new Date(submission.startedAt.getTime() + (contest.durationMinutes || 0) * 60000);
+
         return res.json({
             success: true,
             message: 'Test started successfully',
             data: {
                 contestId: contest._id,
                 title: contest.title,
-                timeRemaining: Math.floor((new Date(contest.endTime) - now) / 1000)
+                timeRemaining: Math.max(0, Math.floor((deadline - now) / 1000))
             }
         });
     } catch (error) {
@@ -306,8 +311,11 @@ const getLeaderboard = async (req, res, next) => {
         }
 
         const now = new Date();
+        // A late joiner may still legitimately be attempting past endTime,
+        // so wait for the last possible personal deadline before unlocking.
+        const lastPossibleDeadline = new Date(new Date(contest.endTime).getTime() + (contest.durationMinutes || 0) * 60000);
         const isEnded =
-            now > new Date(contest.endTime) ||
+            now > lastPossibleDeadline ||
             ['completed', 'ended'].includes((contest.status || '').toLowerCase());
 
         if (!isEnded) {

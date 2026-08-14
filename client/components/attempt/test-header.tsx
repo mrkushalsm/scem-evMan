@@ -9,6 +9,7 @@ import { useTestCompletion } from "./use-test-completion";
 import { getBaseUrl } from "@/lib/env";
 import { getContestData } from "@/actions/contest";
 import { readViolationCount, MAX_VIOLATIONS } from "@/lib/attempt-integrity";
+import TestTimer from "./test-timer";
 
 type ProblemMeta = {
   id: string;
@@ -17,9 +18,10 @@ type ProblemMeta = {
 
 interface TestHeaderProps {
   problems: ProblemMeta[];
+  initialTimeRemaining: number;
 }
 
-export default function TestHeader({ problems }: TestHeaderProps) {
+export default function TestHeader({ problems, initialTimeRemaining }: TestHeaderProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -93,8 +95,9 @@ export default function TestHeader({ problems }: TestHeaderProps) {
 
   return (
     <div className="flex items-center justify-center p-2 select-none h-12 absolute top-0 w-screen bg-primary">
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center shrink-0">
-        <div 
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 shrink-0">
+        <TestTimer initialSecondsRemaining={initialTimeRemaining} />
+        <div
           className="flex items-center gap-1.5 px-3 h-8 bg-primary-foreground/10 text-primary-foreground/90 border border-primary-foreground/20 rounded-full text-xs font-medium hover:bg-primary-foreground/20 transition-colors"
           title={`${MAX_VIOLATIONS - violations} warnings left`}
         >

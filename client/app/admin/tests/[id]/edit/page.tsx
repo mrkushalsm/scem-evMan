@@ -15,6 +15,7 @@ interface MongoTest {
   description: string;
   startTime: string;
   endTime: string;
+  durationMinutes?: number;
   questions?: QuestionReference[];
   rules?: string[];
   status?: string;
@@ -68,6 +69,8 @@ export default async function AdminTestEditPage({
       startsAt: testDataRaw.startTime ? new Date(testDataRaw.startTime).toISOString() : '',
       endsAt: testDataRaw.endTime ? new Date(testDataRaw.endTime).toISOString() : '',
       duration: '',
+      endsAtTime: '',
+      durationMinutes: testDataRaw.durationMinutes || 60,
       problems: (testDataRaw.questions || []).map((q) => typeof q === 'string' ? q : (q._id || q.id || String(q))),
       rules: testDataRaw.rules || [],
       status: (testDataRaw.status || "waiting") as "waiting" | "ongoing" | "completed",

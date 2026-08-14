@@ -11,8 +11,9 @@ export async function saveTest(_prevState: Record<string, unknown>, data: TestSc
     const endDate = new Date(validatedData.endsAt);
     const now = new Date();
     const bufferMs = 5 * 60 * 1000;
+    const isUpdate = !!validatedData.id;
 
-    if (startDate.getTime() < now.getTime() - bufferMs) {
+    if (!isUpdate && startDate.getTime() < now.getTime() - bufferMs) {
       throw new Error("Start time cannot be in the past");
     }
 
@@ -27,12 +28,12 @@ export async function saveTest(_prevState: Record<string, unknown>, data: TestSc
         start: validatedData.startsAt,
         end: validatedData.endsAt,
       },
+      durationMinutes: validatedData.durationMinutes,
       problemIds: validatedData.problems,
       rules: validatedData.rules,
       author: "Admin"
     };
 
-    const isUpdate = !!validatedData.id;
     const url = isUpdate
       ? `/api/admin/tests/${validatedData.id}/edit`
       : `/api/admin/tests/create`;

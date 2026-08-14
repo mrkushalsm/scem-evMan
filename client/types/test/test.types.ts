@@ -13,6 +13,8 @@ export interface Test {
   title: string;
   description: string;
   duration: string;
+  durationMinutes?: number;
+  endsAtTime?: string;
   totalQuestions: number;
   startsAt: string;
   endsAt?: string;

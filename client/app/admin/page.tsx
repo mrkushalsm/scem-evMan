@@ -70,18 +70,12 @@ export default async function AdminAnalyticsPage() {
     return "waiting";
   };
 
-  const formatDuration = (startTime?: string, endTime?: string, fallback?: unknown) => {
+  const formatDuration = (durationMinutes?: number, fallback?: unknown) => {
     if (typeof fallback === "string" && fallback.trim().length > 0) return fallback;
-    if (!startTime || !endTime) return "00:00";
+    if (!durationMinutes || durationMinutes <= 0) return "00:00";
 
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    const diffMs = end.getTime() - start.getTime();
-    if (!Number.isFinite(diffMs) || diffMs <= 0) return "00:00";
-
-    const totalSeconds = Math.floor(diffMs / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = durationMinutes % 60;
 
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   };
@@ -115,7 +109,7 @@ export default async function AdminAnalyticsPage() {
         _id: test._id as string | undefined,
         title: (test.title as string) || "Untitled",
         description: (test.description as string) || "",
-        duration: formatDuration(startTime, endTime, test.duration),
+        duration: formatDuration(test.durationMinutes as number | undefined, test.duration),
         totalQuestions,
         startsAt: startTime || "",
         status: normalizeStatus(test.status, startTime, endTime),

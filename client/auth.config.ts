@@ -76,8 +76,11 @@ export const authConfig = {
                 token.email = u.email
 
                 // Mint a fresh backend token
-                const backendToken = await mintBackendToken(u);
-                token.backendToken = backendToken;
+                try {
+                    token.backendToken = await mintBackendToken(u);
+                } catch (error) {
+                    console.error("Failed to mint backend token:", error);
+                }
             }
             return token
         },

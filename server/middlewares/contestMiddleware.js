@@ -34,8 +34,29 @@ const validateContest = (options = {}) => async (req, res, next) => {
         // Check if contest is manually marked as Completed/Ended or Time is up
         const status = contest.status ? contest.status.toLowerCase() : '';
         const isManuallyEnded = status === 'completed' || status === 'ended';
-        if (options.checkEnded && (now > endTime || isManuallyEnded)) {
-            return res.status(403).json({ success: false, error: 'Contest has ended' });
+
+        // Fetch the user's submission once, shared by checkEnded (personal deadline)
+        // and checkAttemptStatus below — avoids a duplicate query.
+        let submission = null;
+        if ((options.checkEnded || options.checkAttemptStatus) && req.user) {
+            const userId = req.user.id || req.user._id || req.user.sub;
+            submission = await Submission.findOne({ contest: contest._id, user: userId });
+        }
+
+        if (options.checkEnded) {
+            // An active (not yet completed) attempt gets its own deadline —
+            // startedAt + the contest's per-user duration — instead of the
+            // shared join-window endTime, so a late starter isn't cut off
+            // early. No submission yet (or already Completed) falls back to
+            // the join-window cutoff.
+            const activeSubmission = submission && submission.status !== 'Completed' ? submission : null;
+            const deadline = activeSubmission
+                ? new Date(activeSubmission.startedAt.getTime() + (contest.durationMinutes || 0) * 60000)
+                : endTime;
+
+            if (isManuallyEnded || now > deadline) {
+                return res.status(403).json({ success: false, error: 'Contest has ended' });
+            }
         }
 
         // Optional: Check registration if user is attached (auth middleware expected)
@@ -49,10 +70,7 @@ const validateContest = (options = {}) => async (req, res, next) => {
         }
 
         // Check Attempt Status
-        if (options.checkAttemptStatus && req.user) {
-            const userId = req.user.id || req.user._id || req.user.sub;
-            const submission = await Submission.findOne({ contest: contest._id, user: userId });
-
+        if (options.checkAttemptStatus) {
             if (options.checkAttemptStatus === 'NotCompleted') {
                 if (submission && submission.status === 'Completed') {
                     return res.status(403).json({
