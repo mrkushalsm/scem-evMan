@@ -72,8 +72,8 @@ export default function TestCaseCard() {
 
     const handleDownloadTemplate = () => {
         if (!inputVariables || inputVariables.length === 0) return;
-        const headers = ["isVisible", "output", ...inputVariables.map((v: {variable: string}) => v.variable)];
-        const exampleRow = ["FALSE", "Expected Output", ...inputVariables.map((v: {variable: string}) => `Value for ${v.variable}`)];
+        const headers = ["isVisible", "output", "explanation", ...inputVariables.map((v: {variable: string}) => v.variable)];
+        const exampleRow = ["FALSE", "Expected Output", "Optional explanation", ...inputVariables.map((v: {variable: string}) => `Value for ${v.variable}`)];
         const csvContent = headers.join(",") + "\n" + exampleRow.join(",");
         
         const blob = new Blob([csvContent], { type: "text/csv" });
@@ -161,6 +161,7 @@ export default function TestCaseCard() {
                 newTestCases.push({
                     isVisible: rowData['isVisible']?.toUpperCase() === 'TRUE',
                     output: rowData['output'] || '',
+                    explanation: rowData['explanation'] || '',
                     input: inputData
                 });
             }
@@ -352,7 +353,7 @@ export default function TestCaseCard() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => appendTestCase({ input: {}, output: "", isVisible: false })}
+                                    onClick={() => appendTestCase({ input: {}, output: "", explanation: "", isVisible: false })}
                                     disabled={isVariableInvalid}
                                 >
                                     <Plus className="h-4 w-4 mr-2" />
@@ -485,6 +486,27 @@ export default function TestCaseCard() {
                                                     )}
                                                 />
                                             </div>
+                                        </div>
+
+                                        <div className="space-y-3 p-3 bg-background/50 rounded-md border">
+                                            <span className="text-xs font-semibold uppercase text-muted-foreground">Explanation (optional)</span>
+                                            <FormField
+                                                control={control}
+                                                name={`testCases.${index}.explanation`}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormControl>
+                                                            <Textarea
+                                                                {...field}
+                                                                value={field.value ?? ""}
+                                                                placeholder="Shown to users alongside this example, e.g. why the output is what it is"
+                                                                className="min-h-17.5 resize-none text-sm"
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
                                         </div>
                                     </div>
                                 ))}
