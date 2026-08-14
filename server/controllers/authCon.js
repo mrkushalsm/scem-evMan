@@ -12,7 +12,7 @@ const handleLogin = async (req, res, next) => {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash');
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -61,6 +61,10 @@ const handleRegister = async (req, res, next) => {
 
         if (!EMAIL_REGEX.test(email)) {
             return res.status(400).json({ message: 'Invalid email format' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters' });
         }
 
         const normalizedEmail = email.toLowerCase().trim();

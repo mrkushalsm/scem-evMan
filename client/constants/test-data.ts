@@ -240,7 +240,6 @@ export const testsData: Test[] = [
       {
         userId: "user_1",
         name: "Deepthi",
-        email: "deepthi@example.com",
         score: 85,
         status: "PASSED",
         submittedAt: "2025-07-12T14:30:00Z",
@@ -248,7 +247,6 @@ export const testsData: Test[] = [
       {
         userId: "user_2",
         name: "Adithya",
-        email: "adithya@example.com",
         score: 45,
         status: "FAILED",
         submittedAt: "2025-07-12T15:00:00Z",
@@ -256,7 +254,6 @@ export const testsData: Test[] = [
       {
         userId: "user_3",
         name: "Rahul",
-        email: "rahul@example.com",
         score: 92,
         status: "PASSED",
         submittedAt: "2025-07-12T14:45:00Z",

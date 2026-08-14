@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Contest = require('../models/Contest');
 const Submission = require('../models/Submissions');
 
@@ -16,6 +17,10 @@ const validateContest = (options = {}) => async (req, res, next) => {
 
         if (!contestId) {
             return res.status(400).json({ success: false, error: 'Contest ID is required' });
+        }
+
+        if (typeof contestId !== 'string' || !mongoose.isValidObjectId(contestId)) {
+            return res.status(400).json({ success: false, error: 'Invalid contest ID' });
         }
 
         const contest = await Contest.findById(contestId);

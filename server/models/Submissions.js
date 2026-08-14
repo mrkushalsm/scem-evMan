@@ -73,4 +73,7 @@ const submissionSchema = new mongoose.Schema({
 // Ensure one attempt per user per contest
 submissionSchema.index({ contest: 1, user: 1 }, { unique: true });
 
+// Backs the ranked-leaderboard sort/pagination
+submissionSchema.index({ contest: 1, totalScore: -1 });
+
 module.exports = mongoose.models.Submission || mongoose.model('Submission', submissionSchema);

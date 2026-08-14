@@ -125,18 +125,14 @@ export default function BulkImportDialog({
         message: `✓ Successfully imported ${result.imported} question(s)`,
       });
 
-      if (onSuccess) {
-        onSuccess(result.imported);
-      }
-
-      // Reset after successful import
+      // Let the success message show briefly, then close and hand off to
+      // the caller — reset state after, once the dialog is unmounted anyway.
       setTimeout(() => {
         setJsonInput("");
         setValidationResult(null);
         setImportStatus(null);
         onClose();
-        // Page will auto-revalidate via server action
-        window.location.reload();
+        onSuccess?.(result.imported);
       }, 1500);
     } catch (error) {
       setImportStatus({

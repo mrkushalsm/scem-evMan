@@ -43,9 +43,6 @@ app.use("/api/admin", adminRoutes);
 
 app.use("/api/test", contestRoutes);
 
-const submitRoutes = require("./routes/submitRoutes");
-app.use("/api/submit", submitRoutes);
-
 (async () => {
   await connectDB();
   app.listen(port, () => {

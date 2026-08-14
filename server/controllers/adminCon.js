@@ -276,7 +276,23 @@ const getAdminContests = async (req, res, next) => {
         const contests = await Contest.find().select('title description createdAt questions author startTime endTime durationMinutes joinId');
         const now = new Date();
 
-        const summary = await Promise.all(contests.map(async c => {
+        // One grouped query instead of one Submission.find() per contest.
+        const submissionCounts = await Submission.aggregate([
+            { $match: { contest: { $in: contests.map(c => c._id) } } },
+            { $group: {
+                _id: { contest: '$contest', status: '$status' },
+                count: { $sum: 1 },
+            } },
+        ]);
+        const countsByContest = {};
+        submissionCounts.forEach(({ _id, count }) => {
+            const key = _id.contest.toString();
+            countsByContest[key] ??= { total: 0, completed: 0 };
+            countsByContest[key].total += count;
+            if (_id.status === 'Completed') countsByContest[key].completed += count;
+        });
+
+        const summary = contests.map(c => {
             const start = new Date(c.startTime);
             const end = new Date(c.endTime);
 
@@ -289,10 +305,7 @@ const getAdminContests = async (req, res, next) => {
             if (minutes > 0) durationStr += `${minutes}m `;
             if (!durationStr) durationStr = "0m";
 
-            // Count submissions for this contest
-            const contestSubmissions = await Submission.find({ contest: c._id }).select('status');
-            const total = contestSubmissions.length;
-            const completed = contestSubmissions.filter(s => s.status === 'Completed').length;
+            const { total = 0, completed = 0 } = countsByContest[c._id.toString()] || {};
             const ongoing = total - completed;
 
             // Compute Status Dynamically (Pure Time-Based)
@@ -322,7 +335,7 @@ const getAdminContests = async (req, res, next) => {
                 duration: durationStr.trim(),
                 joinId: c.joinId
             };
-        })); // Note: mapped to Promise.all now
+        });
 
         res.status(200).json({ success: true, contests: summary });
     } catch (error) {
@@ -465,6 +478,9 @@ const updateContest = async (req, res, next) => {
         const { id } = req.params;
         const { title, description, duration, durationMinutes, problemIds, rules, visibility } = req.body;
 
+        const existingContest = await Contest.findById(id).select('startTime');
+        if (!existingContest) return res.status(404).json({ success: false, error: 'Contest not found' });
+
         if (title !== undefined && !isNonEmptyString(title)) {
             return res.status(400).json({ success: false, error: 'Title cannot be empty' });
         }
@@ -500,6 +516,12 @@ const updateContest = async (req, res, next) => {
             const now = new Date();
             if (updates.endTime <= now) {
                 return res.status(400).json({ success: false, error: 'End time must be in the future' });
+            }
+
+            // Allow keeping/adjusting an already-past start time (editing a live/ongoing
+            // test), but don't let it be backdated further than it already was.
+            if (updates.startTime < existingContest.startTime && updates.startTime < now) {
+                return res.status(400).json({ success: false, error: 'Start time cannot be moved further into the past' });
             }
         }
         if (problemIds) {
@@ -551,94 +573,6 @@ const getAdminContestResults = async (req, res, next) => {
             },
             results: submissions // Empty array if no submissions
         });
-    } catch (error) {
-        next(error);
-    }
-};
-
-// @desc Export contest results to CSV
-const exportContestResults = async (req, res, next) => {
-    try {
-        await connectDB();
-        const { id } = req.params;
-
-        const contest = await Contest.findById(id).lean();
-        if (!contest) {
-            return res.status(404).json({ success: false, error: 'Contest not found' });
-        }
-
-        const questions = await Question.find({ _id: { $in: contest.questions || [] } }).select('title _id').lean();
-        const questionMap = {};
-        questions.forEach(q => questionMap[q._id.toString()] = q.title);
-
-        const orderedQuestions = (contest.questions || []).map(qId => ({
-            _id: qId.toString(),
-            title: questionMap[qId.toString()] || 'Unknown Question'
-        }));
-
-        const submissions = await Submission.find({ contest: id, status: 'Completed' })
-            .populate('user', 'name email')
-            .populate('submissions.question', 'title')
-            .sort({ totalScore: -1 })
-            .lean();
-
-        // Build CSV Header
-        const headers = ['Rank', 'User Name', 'Email'];
-        
-        // Add columns for each question
-        const questionHeaders = orderedQuestions.map((q, idx) => `Q${idx + 1}: ${q.title}`);
-        headers.push(...questionHeaders);
-        
-        headers.push('Total Score');
-        headers.push('Submitted At');
-
-        const escapeCSV = (val) => {
-            if (val === null || val === undefined) return '';
-            const str = String(val);
-            if (str.includes(',') || str.includes('"') || str.includes('\\n')) {
-                return '"' + str.replace(/"/g, '""') + '"';
-            }
-            return str;
-        };
-
-        const rows = [];
-        rows.push(headers.map(escapeCSV).join(','));
-
-        let rank = 1;
-        submissions.forEach(sub => {
-            const userName = sub.user ? sub.user.name : 'Unknown';
-            const email = sub.user ? sub.user.email : 'Unknown';
-            const totalScore = sub.totalScore || 0;
-            const submittedAt = sub.submittedAt ? new Date(sub.submittedAt).toISOString() : (sub.updatedAt ? new Date(sub.updatedAt).toISOString() : '');
-
-            const rowData = [rank, userName, email];
-
-            const scoreMap = {};
-            if (sub.submissions && Array.isArray(sub.submissions)) {
-                sub.submissions.forEach(sq => {
-                    const qId = sq.question && sq.question._id ? sq.question._id.toString() : null;
-                    if (qId) {
-                        scoreMap[qId] = sq.score || 0;
-                    }
-                });
-            }
-
-            orderedQuestions.forEach(q => {
-                rowData.push(scoreMap[q._id] !== undefined ? scoreMap[q._id] : 0);
-            });
-
-            rowData.push(totalScore);
-            rowData.push(submittedAt);
-
-            rows.push(rowData.map(escapeCSV).join(','));
-            rank++;
-        });
-
-        const csvContent = rows.join('\\n');
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="contest_results.csv"`);
-        return res.status(200).send(csvContent);
     } catch (error) {
         next(error);
     }
@@ -884,7 +818,6 @@ module.exports = {
     getAdminStats,
     importQuestions,
     exportQuestion,
-    getAdminSubmissionDetail,
-    exportContestResults
+    getAdminSubmissionDetail
 };
 

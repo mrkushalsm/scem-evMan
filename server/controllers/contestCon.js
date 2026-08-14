@@ -166,37 +166,48 @@ const getContestData = async (req, res, next) => {
             : new Date(contest.endTime);
         const timeRemaining = Math.max(0, (deadline - new Date()) / 1000);
 
+        // Optional ?qid= trims every other question down to {id, type} —
+        // callers that only render one question (e.g. the question page)
+        // don't need every question's full description/testcases/boilerplate.
+        const { qid } = req.query;
+
         return res.json({
             success: true,
             data: {
                 contestId: contest._id,
                 title: contest.title,
                 timeRemaining,
-                problems: questions.map(q => ({
-                    id: q._id,
-                    type: q.type, // Added type field
-                    title: q.title,
-                    difficulty: q.difficulty,
-                    description: q.description,
-                    inputFormat: q.inputFormat,
-                    outputFormat: q.outputFormat,
-                    constraints: q.constraints,
-                    boilerplateCode: q.boilerplateCode,
-                    questionType: q.questionType,
-                    options: q.options,
-                    marks: q.marks,
-                    savedAnswer: answerMap[q._id.toString()] ? answerMap[q._id.toString()].answer : undefined,
-                    savedCode: answerMap[q._id.toString()] ? answerMap[q._id.toString()].code : undefined,
-                    savedLanguage: answerMap[q._id.toString()] ? answerMap[q._id.toString()].language : undefined,
-                    examples: (q.testcases || [])
-                        .filter(tc => tc.isVisible)
-                        .slice(0, 3)
-                        .map(tc => ({
-                            input: formatTestCaseInput(tc.input, q.inputVariables),
-                            output: tc.output,
-                            explanation: tc.explanation || undefined,
-                        })),
-                }))
+                problems: questions.map(q => {
+                    const id = q._id.toString();
+                    if (qid && qid !== id) {
+                        return { id: q._id, type: q.type };
+                    }
+                    return {
+                        id: q._id,
+                        type: q.type, // Added type field
+                        title: q.title,
+                        difficulty: q.difficulty,
+                        description: q.description,
+                        inputFormat: q.inputFormat,
+                        outputFormat: q.outputFormat,
+                        constraints: q.constraints,
+                        boilerplateCode: q.boilerplateCode,
+                        questionType: q.questionType,
+                        options: q.options,
+                        marks: q.marks,
+                        savedAnswer: answerMap[id] ? answerMap[id].answer : undefined,
+                        savedCode: answerMap[id] ? answerMap[id].code : undefined,
+                        savedLanguage: answerMap[id] ? answerMap[id].language : undefined,
+                        examples: (q.testcases || [])
+                            .filter(tc => tc.isVisible)
+                            .slice(0, 3)
+                            .map(tc => ({
+                                input: formatTestCaseInput(tc.input, q.inputVariables),
+                                output: tc.output,
+                                explanation: tc.explanation || undefined,
+                            })),
+                    };
+                })
             }
         });
     } catch (error) {
@@ -290,16 +301,6 @@ const getTestQuestions = async (req, res, next) => {
     }
 };
 
-// @desc    List all contests
-const listAllContests = async (req, res, next) => {
-    try {
-        const contests = await Contest.find({}, { _id: 1, title: 1, description: 1 });
-        return res.json({ success: true, data: { contests } });
-    } catch (error) {
-        return next(error);
-    }
-};
-
 // @desc    Get ranked leaderboard for a contest
 // @route   GET /api/contest/:id/leaderboard
 // @access  Private (Admin only)
@@ -330,6 +331,7 @@ const getLeaderboard = async (req, res, next) => {
         // Include both Completed and Ongoing submissions — participants whose time
         // expired without clicking "End Test" still have valid scores.
         const submissions = await Submission.find({ contest: contest._id })
+            .select('user totalScore submittedAt status')
             .populate('user', 'name') // name only — no email for privacy
             .lean();
 
@@ -412,7 +414,6 @@ module.exports = {
     getContestLanding,
     getContestData,
     getTestQuestions,
-    listAllContests,
     startTest,
     endTest,
     getLeaderboard

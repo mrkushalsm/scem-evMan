@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import { Plus, Upload } from "lucide-react";
 import BulkImportDialog from "./bulk-import-dialog";
 
 export function QuestionHeader() {
+  const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
@@ -89,8 +91,7 @@ export function QuestionHeader() {
         isOpen={isBulkImportOpen}
         onClose={() => setIsBulkImportOpen(false)}
         onSuccess={() => {
-          // Optionally trigger a page refresh or refetch
-          window.location.reload();
+          router.refresh();
         }}
       />
     </>

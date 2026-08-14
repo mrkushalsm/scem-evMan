@@ -20,8 +20,9 @@ export default async function TestContentPage(props: Props) {
   const { testid, qid } = params;
   const session = await auth();
 
-  // Fetch contest data via student API
-  const res = await fetch(`${getBaseUrl()}/api/test/${testid}/data`, {
+  // Fetch contest data via student API — ?qid trims every other question
+  // down to {id, type} server-side, since only the current one is rendered.
+  const res = await fetch(`${getBaseUrl()}/api/test/${testid}/data?qid=${qid}`, {
     headers: {
       "Authorization": `Bearer ${session?.backendToken}`,
       "Content-Type": "application/json"

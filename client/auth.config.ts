@@ -75,11 +75,13 @@ export const authConfig = {
                 token.id = u.id || u._id
                 token.email = u.email
 
-                // Mint a fresh backend token
+                // Mint a fresh backend token — if this fails, sign-in must fail too,
+                // otherwise the user ends up "signed in" with every backend call 401ing silently.
                 try {
                     token.backendToken = await mintBackendToken(u);
                 } catch (error) {
                     console.error("Failed to mint backend token:", error);
+                    throw new Error("Failed to establish backend session");
                 }
             }
             return token

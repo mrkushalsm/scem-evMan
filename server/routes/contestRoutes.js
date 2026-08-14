@@ -7,7 +7,6 @@ const {
   getContestLanding,
   startTest,
   getContestData,
-  listAllContests,
   endTest,
   getLeaderboard
 } = require("../controllers/contestCon");
@@ -27,9 +26,6 @@ const router = express.Router();
 
 // Join via ID (returns contestId)
 router.post('/join', joinLimiter, validateJoinId);
-
-// List all (dev/debug)
-router.get('/list', listAllContests);
 
 // --- ADMIN ONLY ---
 // Leaderboard — ranked scores after contest ends, name only (no emails)
