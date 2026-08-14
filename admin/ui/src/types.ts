@@ -46,7 +46,7 @@ export type StorageUsage = {
 export type User = {
   _id: string;
   name: string;
-  username: string;
+  email: string;
   role: "admin" | "user";
   createdAt: string;
   updatedAt: string;
@@ -54,14 +54,14 @@ export type User = {
 
 export type CreateUserPayload = {
   name?: string;
-  username: string;
+  email: string;
   password: string;
   role: "admin" | "user";
 };
 
 export type UpdateUserPayload = {
   name?: string;
-  username?: string;
+  email?: string;
   password?: string;
   role?: "admin" | "user";
 };

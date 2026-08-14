@@ -10,7 +10,7 @@ import { getBaseUrl } from "@/lib/env";
 interface User {
     id?: string;
     _id?: string;
-    username?: string | null;
+    email?: string | null;
     role?: string;
     name?: string | null;
 }
@@ -24,7 +24,7 @@ async function mintBackendToken(user: User) {
     const jwt = await new SignJWT({
         userId: user._id || user.id,
         role: user.role,
-        username: user.username
+        email: user.email
     })
         .setProtectedHeader({ alg })
         .setIssuedAt()
@@ -73,7 +73,7 @@ export const authConfig = {
                 const u = user as User;
                 token.role = u.role
                 token.id = u.id || u._id
-                token.username = u.username
+                token.email = u.email
 
                 // Mint a fresh backend token
                 const backendToken = await mintBackendToken(u);
@@ -85,7 +85,7 @@ export const authConfig = {
             if (token && session.user) {
                 session.user.role = token.role as string
                 session.user.id = token.id as string
-                session.user.username = token.username as string
+                session.user.email = token.email as string
                 session.backendToken = token.backendToken as string
             }
             return session
@@ -95,17 +95,17 @@ export const authConfig = {
         Credentials({
             async authorize(credentials) {
                 const parsedCredentials = z
-                    .object({ username: z.string().min(3), password: z.string().min(6) })
+                    .object({ email: z.string().email(), password: z.string().min(6) })
                     .safeParse(credentials);
 
                 if (parsedCredentials.success) {
-                    const { username, password } = parsedCredentials.data;
+                    const { email, password } = parsedCredentials.data;
 
                     try {
                         const res = await fetch(`${getBaseUrl()}/api/auth/login`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username, password })
+                            body: JSON.stringify({ email, password })
                         });
 
                         const data = await res.json();

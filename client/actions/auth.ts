@@ -6,14 +6,15 @@ import { z } from "zod";
 import { getBaseUrl } from "@/lib/env";
 
 const RegisterSchema = z.object({
-    username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_.@]+$/, "Only letters, numbers, underscores, periods, and @ allowed"),
+    name: z.string().min(1).max(100),
+    email: z.string().email("Invalid email format"),
     password: z.string().min(6),
 });
 
 export async function authenticate(prevState: string | undefined, formData: FormData) {
     try {
         await signIn("credentials", {
-            username: formData.get("username"),
+            email: formData.get("email"),
             password: formData.get("password"),
             redirect: false,
         });
@@ -38,13 +39,13 @@ export async function register(prevState: string | undefined, formData: FormData
         return "Invalid fields";
     }
 
-    const { username, password } = validatedFields.data;
+    const { name, email, password } = validatedFields.data;
 
     try {
         const res = await fetch(`${getBaseUrl()}/api/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ name, email, password })
         });
 
         const data = await res.json();

@@ -519,7 +519,7 @@ const getAdminContestResults = async (req, res, next) => {
 
         // Step 4: Query submissions with population
         const submissions = await Submission.find({ contest: id })
-            .populate('user', 'name username')
+            .populate('user', 'name email')
             .populate('submissions.question', 'title marks questionType difficulty')
             .sort({ totalScore: -1 }) // Step 5: Sort by score descending (leaderboard)
             .lean();
@@ -561,13 +561,13 @@ const exportContestResults = async (req, res, next) => {
         }));
 
         const submissions = await Submission.find({ contest: id, status: 'Completed' })
-            .populate('user', 'name username')
+            .populate('user', 'name email')
             .populate('submissions.question', 'title')
             .sort({ totalScore: -1 })
             .lean();
 
         // Build CSV Header
-        const headers = ['Rank', 'User Name', 'Username'];
+        const headers = ['Rank', 'User Name', 'Email'];
         
         // Add columns for each question
         const questionHeaders = orderedQuestions.map((q, idx) => `Q${idx + 1}: ${q.title}`);
@@ -591,11 +591,11 @@ const exportContestResults = async (req, res, next) => {
         let rank = 1;
         submissions.forEach(sub => {
             const userName = sub.user ? sub.user.name : 'Unknown';
-            const username = sub.user ? sub.user.username : 'Unknown';
+            const email = sub.user ? sub.user.email : 'Unknown';
             const totalScore = sub.totalScore || 0;
             const submittedAt = sub.submittedAt ? new Date(sub.submittedAt).toISOString() : (sub.updatedAt ? new Date(sub.updatedAt).toISOString() : '');
 
-            const rowData = [rank, userName, username];
+            const rowData = [rank, userName, email];
 
             const scoreMap = {};
             if (sub.submissions && Array.isArray(sub.submissions)) {

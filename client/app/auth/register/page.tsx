@@ -16,7 +16,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { register } from "@/actions/auth";
 
 function RegisterForm() {
-  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,12 +41,14 @@ function RegisterForm() {
   const validateForm = () => {
     const errors: string[] = [];
 
-    if (!username.trim()) {
-      errors.push("Username is required.");
-    } else if (username.length < 3) {
-      errors.push("Username must be at least 3 characters.");
-    } else if (!/^[a-zA-Z0-9_.@]+$/.test(username)) {
-      errors.push("Username can only contain letters, numbers, underscores, periods, and @.");
+    if (!name.trim()) {
+      errors.push("Name is required.");
+    }
+
+    if (!email.trim()) {
+      errors.push("Email is required.");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.push("Please enter a valid email address.");
     }
 
     if (!password.trim()) {
@@ -60,8 +63,8 @@ function RegisterForm() {
       errors.push("Passwords do not match.");
     }
 
-    if (username && password && username === password) {
-      errors.push("Username and password should not be the same.");
+    if (email && password && email === password) {
+      errors.push("Email and password should not be the same.");
     }
 
     if (errors.length > 0) {
@@ -81,7 +84,8 @@ function RegisterForm() {
       setLoading(true);
 
       const formData = new FormData();
-      formData.append("username", username);
+      formData.append("name", name);
+      formData.append("email", email);
       formData.append("password", password);
 
       const result = await register(undefined, formData);
@@ -162,17 +166,31 @@ function RegisterForm() {
               </p>
 
               <div className="relative">
+                <FaCheckCircle
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                  size={18}
+                />
+                <Input
+                  className="pl-12 pr-4 py-3 bg-muted text-foreground rounded-md"
+                  type="text"
+                  placeholder="Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  name="name"
+                />
+              </div>
+              <div className="relative">
                 <MdEmail
                   className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground"
                   size={20}
                 />
                 <Input
                   className="pl-12 pr-4 py-3 bg-muted text-foreground rounded-md"
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  name="username"
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  name="email"
                 />
               </div>
               <div className="relative">

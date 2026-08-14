@@ -16,7 +16,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { authenticate } from "@/actions/auth";
 
 function LoginForm() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [ssoError, setSsoError] = useState("");
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -38,14 +38,11 @@ function LoginForm() {
   const validateForm = () => {
     let valid = true;
 
-    if (!username.trim()) {
-      toast.error("Username is required.");
+    if (!email.trim()) {
+      toast.error("Email is required.");
       valid = false;
-    } else if (username.length < 3) {
-      toast.error("Username must be at least 3 characters.");
-      valid = false;
-    } else if (!/^[a-zA-Z0-9_.@]+$/.test(username)) {
-      toast.error("Username can only contain letters, numbers, underscores, periods, and @.");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Please enter a valid email address.");
       valid = false;
     }
 
@@ -68,7 +65,7 @@ function LoginForm() {
 
     try {
       const formData = new FormData();
-      formData.append("username", username);
+      formData.append("email", email);
       formData.append("password", password);
 
       const result = await authenticate(undefined, formData);
@@ -129,11 +126,11 @@ function LoginForm() {
                   />
                   <Input
                     className="pl-12 pr-4 py-3 bg-muted text-foreground rounded-md"
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    name="username"
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    name="email"
                   />
                 </div>
               </div>

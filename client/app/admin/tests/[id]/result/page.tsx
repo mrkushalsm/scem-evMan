@@ -25,7 +25,7 @@ import { LocalTime } from "@/components/ui/local-time";
 interface Participant {
     userId: string;
     name: string;
-    username: string;
+    email: string;
     score: number;
     submittedAt: string;
 }
@@ -52,7 +52,7 @@ interface MongoContest {
 interface MongoUser {
     _id: string;
     name: string;
-    username: string;
+    email: string;
 }
 
 interface MongoSubmission {
@@ -84,7 +84,7 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
         .map(sub => ({
             userId: sub.user?._id || 'unknown',
             name: sub.user?.name || 'Unknown User',
-            username: sub.user?.username || 'N/A',
+            email: sub.user?.email || 'N/A',
             score: sub.totalScore || 0,
             submittedAt: sub.submittedAt
         }));
@@ -187,7 +187,7 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
                                                         </div>
                                                         <div className="min-w-0">
                                                             <div className="truncate font-semibold text-foreground">{p.name}</div>
-                                                            <div className="truncate text-sm text-muted-foreground">@{p.username}</div>
+                                                            <div className="truncate text-sm text-muted-foreground">{p.email}</div>
                                                         </div>
                                                     </div>
                                                 </TableCell>
