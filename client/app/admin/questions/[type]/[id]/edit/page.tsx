@@ -59,7 +59,9 @@ export default async function EditQuestionPage({
     outputFormat: data.outputFormat || "",
     boilerplate: data.boilerplateCode || {},
     constraints: typeof data.constraints === 'string'
-      ? data.constraints.split(',').map((s: string) => s.trim()).filter(Boolean)
+      ? (data.constraints.includes('\n')
+          ? data.constraints.split('\n').map((s: string) => s.trim()).filter(Boolean)
+          : data.constraints.split(',').map((s: string) => s.trim()).filter(Boolean)) // legacy comma-joined fallback
       : (Array.isArray(data.constraints) ? data.constraints : [""]),
     functionName: data.functionName || "",
     inputVariables: data.inputVariables || [],
