@@ -25,6 +25,33 @@ const removeTrailingLineCommands = (output) => {
     return output.replace(/\s+$/g, '');
 };
 
+// Judge0's own CPU limit is ~15s (config/judge0/judge0.conf), plus compile time and
+// queueing headroom — must stay well above that or correct-but-slow submissions
+// (Java especially: JVM startup + javac) get killed and shown as failed.
+const JUDGE0_TIMEOUT_MS = 45000;
+
+// Per-language cap on concurrent in-flight Judge0 requests. Languages not listed run
+// fully parallel (one request per test case). Add an entry here for any language whose
+// runtime is heavy enough that firing every test case at once causes contention
+// (JVM startup, GC/JIT threads, etc.) — Java is the current known case.
+const LANGUAGE_CONCURRENCY_LIMITS = {
+    java: 5,
+};
+
+// Runs fn over items with at most `limit` in flight at once, preserving item order in the result.
+const mapWithConcurrency = async (items, limit, fn) => {
+    const results = new Array(items.length);
+    let cursor = 0;
+    const worker = async () => {
+        while (cursor < items.length) {
+            const index = cursor++;
+            results[index] = await fn(items[index], index);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
+};
+
 // Common logic for executing code against test cases
 const executeTestCases = async ({ question, code, language, testCases, judge0Id, forceVisible = false, onProgress }) => {
     const judge0Url = process.env.JUDGE0_URL || 'http://localhost:2358';
@@ -45,9 +72,10 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
         console.warn(`Could not wrap code for ${language}, using original code:`, err.message);
     }
 
-    const results = [];
-    for (let index = 0; index < testCases.length; index++) {
-        const tc = testCases[index];
+    let completed = 0;
+    const concurrency = LANGUAGE_CONCURRENCY_LIMITS[language.toLowerCase()] || testCases.length;
+
+    const results = await mapWithConcurrency(testCases, concurrency, async (tc, index) => {
         // Prepare input
         let input = '';
         if (typeof tc.input === 'object' && tc.input !== null) {
@@ -72,6 +100,7 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
         const base64SourceCode = Buffer.from(wrappedCode).toString('base64');
         const base64Input = Buffer.from(input).toString('base64');
 
+        let resultEntry;
         try {
             const response = await fetch(`${judge0Url}/submissions?base64_encoded=true&wait=true`, {
                 method: "POST",
@@ -82,6 +111,7 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
                     stdin: base64Input,
                     expected_output: Buffer.from(expectedOutput).toString('base64'),
                 }),
+                signal: AbortSignal.timeout(JUDGE0_TIMEOUT_MS),
             });
             const result = await response.json();
             const isPassed = result.status && result.status.id === 3;
@@ -90,7 +120,7 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
             const decodedStderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : '';
             const decodedCompileOutput = result.compile_output ? Buffer.from(result.compile_output, 'base64').toString('utf-8') : '';
 
-            results.push({
+            resultEntry = {
                 testCase: index + 1,
                 passed: isPassed,
                 input: input,
@@ -99,19 +129,21 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
                 error: decodedStderr || decodedCompileOutput || (result.status ? result.status.description : "Unknown Error"),
                 status: result.status ? result.status.description : "Unknown",
                 isVisible: forceVisible || tc.isVisible
-            });
+            };
         } catch (err) {
-            results.push({
+            resultEntry = {
                 testCase: index + 1,
                 passed: false,
-                status: "System Error",
-                error: err.message,
+                status: err.name === "TimeoutError" ? "Time Limit Exceeded" : "System Error",
+                error: err.name === "TimeoutError" ? "Judge0 did not respond in time" : err.message,
                 isVisible: tc.isVisible
-            });
+            };
         }
 
-        onProgress?.(index + 1, testCases.length);
-    }
+        completed += 1;
+        onProgress?.(completed, testCases.length);
+        return resultEntry;
+    });
 
     return results;
 };
@@ -286,24 +318,13 @@ const submitCode = async (req, res, next) => {
             });
         } else {
             const existingIdx = existingSubmission.submissions.findIndex(s => s.question.toString() === questionId);
-            if (existingIdx > -1) {
-                await Submission.findByIdAndUpdate(
-                    existingSubmission._id,
-                    { $set: { [`submissions.${existingIdx}`]: entry } }
-                );
-            } else {
-                await Submission.findByIdAndUpdate(
-                    existingSubmission._id,
-                    { $push: { submissions: entry } }
-                );
-            }
-            // Recalculate total score from DB to avoid stale in-memory state
-            const updated = await Submission.findById(existingSubmission._id);
-            if (updated) {
-                await Submission.findByIdAndUpdate(existingSubmission._id, {
-                    $set: { totalScore: updated.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0) }
-                });
-            }
+            const updatedSubmissions = existingIdx > -1
+                ? existingSubmission.submissions.map((s, i) => i === existingIdx ? entry : s)
+                : [...existingSubmission.submissions, entry];
+            const totalScore = updatedSubmissions.reduce((acc, curr) => acc + (curr.score || 0), 0);
+            await Submission.findByIdAndUpdate(existingSubmission._id, {
+                $set: { submissions: updatedSubmissions, totalScore }
+            });
         }
 
         const clientResults = results.map(r => ({
@@ -395,23 +416,13 @@ const saveMCQ = async (req, res, next) => {
             });
         } else {
             const existingIdx = existingSubmission.submissions.findIndex(s => s.question.toString() === questionId);
-            if (existingIdx > -1) {
-                await Submission.findByIdAndUpdate(
-                    existingSubmission._id,
-                    { $set: { [`submissions.${existingIdx}`]: entry } }
-                );
-            } else {
-                await Submission.findByIdAndUpdate(
-                    existingSubmission._id,
-                    { $push: { submissions: entry } }
-                );
-            }
-            const updatedMcq = await Submission.findById(existingSubmission._id);
-            if (updatedMcq) {
-                await Submission.findByIdAndUpdate(existingSubmission._id, {
-                    $set: { totalScore: updatedMcq.submissions.reduce((acc, curr) => acc + (curr.score || 0), 0) }
-                });
-            }
+            const updatedSubmissions = existingIdx > -1
+                ? existingSubmission.submissions.map((s, i) => i === existingIdx ? entry : s)
+                : [...existingSubmission.submissions, entry];
+            const totalScore = updatedSubmissions.reduce((acc, curr) => acc + (curr.score || 0), 0);
+            await Submission.findByIdAndUpdate(existingSubmission._id, {
+                $set: { submissions: updatedSubmissions, totalScore }
+            });
         }
 
         return res.status(200).json({ success: true, score });
