@@ -115,9 +115,7 @@ export class ComposeCommand {
       ...(process.env as Record<string, string>),
       // Activate ALL profiles during teardown so that previously active
       // internal containers get properly stopped/removed.
-      // internal-judge0 stays listed so an upgrade tears down containers created by
-      // the previous release's profile. Remove it once no deployment predates citron.
-      COMPOSE_PROFILES: "internal-db,internal-citron,internal-judge0",
+      COMPOSE_PROFILES: "internal-db,internal-citron",
       // Dummy values to prevent "variable is not set" warnings during teardown
       DOMAIN: "localhost",
       PROTOCOL: "http",
@@ -126,8 +124,6 @@ export class ComposeCommand {
       MONGODB_URI: "dummy",
       AUTH_SECRET: "dummy",
       CITRON_URL: "dummy",
-      REDIS_PASSWORD: "dummy",
-      POSTGRES_PASSWORD: "dummy",
     };
 
     return new ComposeCommand(baseArgs, releaseDir, env);
