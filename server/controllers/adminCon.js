@@ -83,7 +83,7 @@ const createProblem = async (req, res, next) => {
             }));
 
             // Iterate selected languages
-            const supportedLangs = ['c', 'java', 'python'];
+            const supportedLangs = ['c', 'cpp', 'java', 'python'];
 
             // Remove unsupported languages from the object to prevent saving them
             Object.keys(boilerplateCode).forEach(key => {
@@ -182,7 +182,7 @@ const updateProblem = async (req, res, next) => {
                 type: v.type // Correct access
             }));
 
-            const supportedLangs = ['c', 'java', 'python'];
+            const supportedLangs = ['c', 'cpp', 'java', 'python'];
 
             // Remove unsupported languages
             Object.keys(boilerplateCode).forEach(key => {

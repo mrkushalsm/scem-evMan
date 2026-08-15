@@ -156,7 +156,7 @@ function transformQuestionToMongo(question) {
     let boilerplateCode = coding.boilerplateCode;
     if (!boilerplateCode || Object.keys(boilerplateCode).length === 0) {
       boilerplateCode = {};
-      const supportedLangs = ['c', 'java', 'python'];
+      const supportedLangs = ['c', 'cpp', 'java', 'python'];
       const inputs = (coding.inputVariables || []).map(v => ({
         variable: v.variable,
         type: v.type
