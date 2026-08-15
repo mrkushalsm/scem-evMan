@@ -77,7 +77,7 @@ either `"coding"` or `"mcq"`, with the fields below.
   "difficulty": "Easy" | "Medium" | "Hard",
   "questionType": "Single Correct" | "Multiple Correct",
   "options": ["string", "string", "string", "string"],
-  "correctAnswer": "string — must exactly match one entry in options (or a comma-separated list of them, for Multiple Correct)"
+  "correctAnswer": "string — must exactly match one entry in options (for Multiple Correct, use a JSON array of exact option strings instead of a single string — the importer does not split on commas)"
 }
 ```
 
@@ -316,7 +316,7 @@ either `"coding"` or `"mcq"`, with the fields below.
   "difficulty": "Easy" | "Medium" | "Hard",
   "questionType": "Single Correct" | "Multiple Correct",
   "options": ["string", "string", "string", "string"],
-  "correctAnswer": "string — must exactly match one entry in options (or a comma-separated list of them, for Multiple Correct)"
+  "correctAnswer": "string — must exactly match one entry in options (for Multiple Correct, use a JSON array of exact option strings instead of a single string — the importer does not split on commas)"
 }
 ```
 

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LocalTime } from "@/components/ui/local-time";
 import {
     ArrowLeft,
+    AlertCircle,
+    Check,
     CheckCircle2,
     XCircle,
     Code2,
@@ -84,6 +86,7 @@ interface SubmissionDetail {
     points: number;
     earnedPoints: number;
     status: SubmissionStatus;
+    questionType?: string;
     selectedOptions?: string[];
     correctOptions?: string[];
     options?: { id: string; text: string }[];
@@ -135,6 +138,7 @@ function mapSubmissionDetail(submissionItem: RawSubmissionItem): SubmissionDetai
             points: question.marks,
             earnedPoints: submissionItem.score || 0,
             status: (submissionItem.score || 0) === question.marks ? "PASSED" : "FAILED",
+            questionType: question.questionType,
             selectedOptions: submissionItem.answer || [],
             correctOptions: (question.correctAnswer || "")
                 .split(",")
@@ -283,6 +287,7 @@ export default async function SubmissionDetailPage({
                                             </div>
                                             <CardDescription className="text-sm">
                                                 Points Earned: <span className="font-mono font-medium text-foreground">{detail.earnedPoints}</span> / {detail.points}
+                                                {detail.questionType && <span> · {detail.questionType}</span>}
                                             </CardDescription>
                                         </div>
                                         <Badge variant={getSubmissionStatusVariant(detail.status)} className="w-fit shrink-0 self-start">
@@ -292,28 +297,15 @@ export default async function SubmissionDetailPage({
                                     <CardContent className="space-y-6">
                                         {detail.type === "mcq" ? (
                                             <div className="grid gap-2">
-                                                {detail.options?.map((opt) => {
-                                                    const isSelected = detail.selectedOptions?.includes(opt.text);
-                                                    const isCorrect = detail.correctOptions?.includes(opt.id);
-
-                                                    let appearance = "border-border bg-muted/30 text-muted-foreground";
-                                                    if (isSelected && isCorrect) appearance = "border-primary/30 bg-primary/10 text-primary";
-                                                    else if (isSelected && !isCorrect) appearance = "border-destructive/30 bg-destructive/10 text-destructive";
-                                                    else if (!isSelected && isCorrect) appearance = "border-primary/20 bg-primary/5 text-primary";
-
-                                                    return (
-                                                        <div
-                                                            key={opt.id}
-                                                            className={`flex items-center justify-between rounded-xl border p-4 ${appearance}`}
-                                                        >
-                                                            <span className="text-sm font-medium">{opt.text}</span>
-                                                            <div className="flex gap-2">
-                                                                {isCorrect && <CheckCircle2 className="h-4 w-4" />}
-                                                                {isSelected && !isCorrect && <XCircle className="h-4 w-4" />}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                {detail.options?.map((opt, optIdx) => (
+                                                    <McqOptionRow
+                                                        key={opt.id}
+                                                        letter={String.fromCharCode(65 + optIdx)}
+                                                        text={opt.text}
+                                                        isCorrect={!!detail.correctOptions?.includes(opt.id)}
+                                                        isSelected={!!detail.selectedOptions?.includes(opt.text)}
+                                                    />
+                                                ))}
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
@@ -413,10 +405,58 @@ export default async function SubmissionDetailPage({
     );
 }
 
+// Two independent signals, so a multi-select answer stays readable: the row's colour
+// says whether the option IS a correct answer, the checkbox says whether the candidate
+// picked it. A correct answer they missed is green but dashed and unchecked.
+function McqOptionRow({ letter, text, isCorrect, isSelected }: { letter: string; text: string; isCorrect: boolean; isSelected: boolean }) {
+    const missed = isCorrect && !isSelected;
+    const wrongPick = isSelected && !isCorrect;
+
+    const row = isCorrect
+        ? `border-primary/60 bg-primary/5${missed ? " border-dashed" : ""}`
+        : wrongPick
+            ? "border-destructive/60 bg-destructive/5"
+            : "border-border bg-muted/20";
+
+    const letterBadge = isCorrect
+        ? "bg-primary/15 text-primary"
+        : wrongPick
+            ? "bg-destructive/15 text-destructive"
+            : "bg-muted text-muted-foreground";
+
+    const box = !isSelected
+        ? "border-muted-foreground/30 bg-background"
+        : isCorrect
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-destructive bg-destructive text-white";
+
+    return (
+        <div className={`flex items-center gap-3 rounded-xl border p-3.5 ${row}`}>
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${letterBadge}`}>
+                {letter}
+            </span>
+            <span
+                aria-hidden
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 ${box}`}
+            >
+                {isSelected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+            </span>
+            <span className="min-w-0 flex-1 break-words text-sm font-medium text-foreground">{text}</span>
+            {isCorrect && isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />}
+            {missed && <AlertCircle className="h-4 w-4 shrink-0 text-primary" />}
+            {wrongPick && <XCircle className="h-4 w-4 shrink-0 text-destructive" />}
+            <span className="sr-only">
+                {isCorrect ? "Correct answer" : "Incorrect answer"}
+                {isSelected ? ", selected by candidate" : ", not selected"}
+            </span>
+        </div>
+    );
+}
+
 function StatItem({ icon, label, value, mono = true }: { icon: React.ReactNode; label: string; value: React.ReactNode; mono?: boolean }) {
     return (
         <Card className="h-full border-border bg-card shadow-sm">
-            <CardContent className="flex min-h-24 h-full items-center gap-3 px-5 py-">
+            <CardContent className="flex min-h-24 h-full items-center gap-3 px-5 py-4">
                 <div className="shrink-0 rounded-xl border border-border bg-muted/30 p-2.5 text-muted-foreground">
                     {icon}
                 </div>

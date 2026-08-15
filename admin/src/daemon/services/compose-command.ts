@@ -17,7 +17,7 @@ export type CommandDescriptor = {
  *
  * Reads config once and produces correct command descriptors for any
  * compose operation, respecting infrastructure mode (internal/external)
- * for database and judge0 profiles.
+ * for database and citron profiles.
  *
  * Usage:
  *   const compose = ComposeCommand.from(paths);
@@ -26,7 +26,7 @@ export type CommandDescriptor = {
  *   const desc = compose.ps();          // list containers as JSON
  *   const desc = compose.reloadCaddy(); // exec caddy reload (no restart)
  *   const desc = compose.restartCaddy(); // full container restart (for port changes)
- *   const desc = compose.restartServices("judge0-server", "judge0-workers");
+ *   const desc = compose.restartServices("citron");
  *
  * For teardown (uninstall), use the minimal factory:
  *   const desc = ComposeCommand.forTeardown(paths).down();
@@ -54,13 +54,13 @@ export class ComposeCommand {
     const caddyHttp = cfgYaml.ports?.caddyHttp ?? 80;
     const caddyHttps = cfgYaml.ports?.caddyHttps ?? 443;
     const dbMode = cfgYaml.infrastructure?.database?.mode ?? "internal";
-    const judgeMode = cfgYaml.infrastructure?.judge0?.mode ?? "internal";
+    const citronMode = cfgYaml.infrastructure?.citron?.mode ?? "internal";
     const domain = cfgYaml.app?.domain ?? "localhost";
     const protocol = cfgYaml.app?.protocol ?? "http";
 
     const profiles: string[] = [];
     if (dbMode === "internal") profiles.push("internal-db");
-    if (judgeMode === "internal") profiles.push("internal-judge0");
+    if (citronMode === "internal") profiles.push("internal-citron");
 
     const env: Record<string, string> = {
       ...process.env as Record<string, string>,
@@ -74,8 +74,8 @@ export class ComposeCommand {
     if (dbMode === "internal") {
       env.MONGODB_URI = "mongodb://mongo:27017/pomelo";
     }
-    if (judgeMode === "internal") {
-      env.JUDGE0_URL = "http://judge0-server:2358";
+    if (citronMode === "internal") {
+      env.CITRON_URL = "http://citron:2358";
     }
 
     // Base args shared by every compose invocation
@@ -84,7 +84,7 @@ export class ComposeCommand {
       "--project-name", cfg.project,
       "--env-file", paths.envFile,
       "-f", cfg.app,
-      "-f", cfg.judge,
+      "-f", cfg.citron,
       "--project-directory", releaseDir,
     ];
 
@@ -107,7 +107,7 @@ export class ComposeCommand {
       "compose",
       "--project-name", cfg.project,
       "-f", cfg.app,
-      "-f", cfg.judge,
+      "-f", cfg.citron,
       "--project-directory", releaseDir,
     ];
 
@@ -115,7 +115,7 @@ export class ComposeCommand {
       ...(process.env as Record<string, string>),
       // Activate ALL profiles during teardown so that previously active
       // internal containers get properly stopped/removed.
-      COMPOSE_PROFILES: "internal-db,internal-judge0",
+      COMPOSE_PROFILES: "internal-db,internal-citron",
       // Dummy values to prevent "variable is not set" warnings during teardown
       DOMAIN: "localhost",
       PROTOCOL: "http",
@@ -123,9 +123,7 @@ export class ComposeCommand {
       CADDY_HTTPS_PORT: "443",
       MONGODB_URI: "dummy",
       AUTH_SECRET: "dummy",
-      JUDGE0_URL: "dummy",
-      REDIS_PASSWORD: "dummy",
-      POSTGRES_PASSWORD: "dummy",
+      CITRON_URL: "dummy",
     };
 
     return new ComposeCommand(baseArgs, releaseDir, env);

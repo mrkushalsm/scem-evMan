@@ -4,7 +4,7 @@ This document outlines the process for contributing to the Pomelo repository and
 
 ## Local Development Setup
 
-To run Pomelo locally for development, you must start the background dependencies (MongoDB and Judge0) via Docker and run the frontend and backend servers directly on your host machine.
+To run Pomelo locally for development, you must start the background dependencies (MongoDB and Citron) via Docker and run the frontend and backend servers directly on your host machine.
 
 ### Prerequisites
 
@@ -26,15 +26,15 @@ Review the `.env` files and populate any required variables (e.g., `AUTH_SECRET`
 
 ### Step 2: Start Infrastructure Dependencies
 
-Start the MongoDB database and Judge0 execution environment using Docker Compose from the root directory.
+Start the MongoDB database and Citron execution engine using Docker Compose from the root directory.
 
 ```bash
 docker compose --project-name pomelo \
   --env-file .env \
   -f docker/app/docker-compose.dev.yaml \
-  -f docker/judge0/docker-compose.dev.yaml \
+  -f docker/citron/docker-compose.dev.yaml \
   --project-directory . \
-  up mongo judge0-server judge0-workers seed -d
+  up mongo citron seed -d
 ```
 
 ### Step 3: Start the Application

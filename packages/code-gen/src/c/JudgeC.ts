@@ -3,11 +3,20 @@ import * as configFile from './config.json';
 
 const config = configFile as LanguageConfig;
 
+// C and C++ generate the same wrapper shape — declare, read from stdin, call the
+// user's function — and differ only in their config. The logic lives here and the
+// C++ judge supplies its own config rather than repeating it.
 export class JudgeC implements Judge {
+    protected readonly config: LanguageConfig;
+
+    constructor(languageConfig: LanguageConfig = config) {
+        this.config = languageConfig;
+    }
+
     generateBoilerplate(problemConfig: ProblemConfig): string {
         const method = problemConfig.method || 'solve';
         const args: string[] = [];
-        const typeConfig = config.types;
+        const typeConfig = this.config.types;
 
         if (problemConfig.input && Array.isArray(problemConfig.input)) {
             for (const param of problemConfig.input) {
@@ -19,13 +28,13 @@ export class JudgeC implements Judge {
             }
         }
 
-        return config.boilerplate
+        return this.config.boilerplate
             .replace('{method}', method)
             .replace('{args}', args.join(', '));
     }
 
     wrapCode(userCode: string, problemConfig: ProblemConfig): string {
-        const template = config.template;
+        const template = this.config.template;
         const inputReadingCode = this.generateInputReader(problemConfig);
 
         return template
@@ -37,7 +46,7 @@ export class JudgeC implements Judge {
         const lines: string[] = [];
         const variables: string[] = [];
         const indent = "    ";
-        const typeConfig = config.types;
+        const typeConfig = this.config.types;
 
         if (problemConfig.input && Array.isArray(problemConfig.input)) {
             // Declare variables

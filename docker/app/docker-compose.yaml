@@ -23,7 +23,7 @@ services:
       - MONGODB_URI=${MONGODB_URI}
       - PORT=8080
       - AUTH_SECRET=${AUTH_SECRET}
-      - JUDGE0_URL=${JUDGE0_URL}
+      - CITRON_URL=${CITRON_URL}
       - DOMAIN=${DOMAIN}
       - PROTOCOL=${PROTOCOL:-http}
     depends_on:

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { Pencil } from "lucide-react";
 
-const languageList = ["c", "java", "python"];
+const languageList = ["c", "cpp", "java", "python"];
 
 export default function BoilerplateCard() {
   const { setValue, watch, unregister } = useFormContext();

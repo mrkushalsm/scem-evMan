@@ -11,7 +11,8 @@ export type Paths = {
   envFile: string;
   configFile: string;
   caddyFile: string;
-  judge0File: string;
+  citronConfFile: string;
+  citronLanguagesFile: string;
 };
 
 export type Logger = {

@@ -1,6 +1,6 @@
 // Formats a test case's input for display as a LeetCode-style example
 // (e.g. "nums = [2, 7, 11, 15], target = 9"), independent of the
-// judge0-stdin formatting used at judge time (see submitCon.js).
+// stdin formatting used at execution time (see submitCon.js).
 
 const formatValue = (value) => {
   if (Array.isArray(value)) {

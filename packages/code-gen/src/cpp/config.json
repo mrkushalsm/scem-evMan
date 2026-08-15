@@ -1,0 +1,35 @@
+{
+  "language": "cpp",
+  "boilerplate": "#include <bits/stdc++.h>\nusing namespace std;\n\nvoid {method}({args}) {\n    // TODO: Implement solution\n    cout << \"Output goes here\" << endl;\n}",
+  "template": "#include <bits/stdc++.h>\nusing namespace std;\n\n{code}\n\nint main() {\n    ios_base::sync_with_stdio(false);\n    cin.tie(nullptr);\n{input_reading_code}\n    return 0;\n}",
+  "types": {
+    "int": {
+      "reader": "cin >> {var};",
+      "hint": "int"
+    },
+    "float": {
+      "reader": "cin >> {var};",
+      "hint": "double"
+    },
+    "char": {
+      "reader": "cin >> {var};",
+      "hint": "char"
+    },
+    "string": {
+      "reader": "cin >> {var};",
+      "hint": "string"
+    },
+    "int_array": {
+      "reader": "cin >> {var}_size; for(int i=0; i<{var}_size; i++) { cin >> {var}[i]; }",
+      "hint": "int*"
+    },
+    "float_array": {
+      "reader": "cin >> {var}_size; for(int i=0; i<{var}_size; i++) { cin >> {var}[i]; }",
+      "hint": "double*"
+    },
+    "string_array": {
+      "reader": "cin >> {var}_size; for(int i=0; i<{var}_size; i++) { cin >> {var}[i]; }",
+      "hint": "string*"
+    }
+  }
+}

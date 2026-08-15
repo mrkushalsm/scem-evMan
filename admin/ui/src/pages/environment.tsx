@@ -17,7 +17,8 @@ export default function EnvironmentPage() {
   const [appEnv, setAppEnv] = useState("");
   const [configYaml, setConfigYaml] = useState("");
   const [caddyfile, setCaddyfile] = useState("");
-  const [judge0, setJudge0] = useState("");
+  const [citron, setCitron] = useState("");
+  const [citronLanguages, setCitronLanguages] = useState("");
 
   useEffect(() => {
     api.getConfig().then((c) => {
@@ -25,11 +26,12 @@ export default function EnvironmentPage() {
       setAppEnv(c.appEnv);
       setConfigYaml(c.configYaml);
       setCaddyfile(c.caddyfile);
-      setJudge0(c.judge0);
+      setCitron(c.citron);
+      setCitronLanguages(c.citronLanguages);
     }).catch(() => {});
   }, []);
 
-  async function performRestart(target: "all" | "caddy" | "judge") {
+  async function performRestart(target: "all" | "caddy" | "citron") {
     try {
       await api.restart(target);
     } catch (err: any) {
@@ -41,7 +43,7 @@ export default function EnvironmentPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await api.updateConfig({ appEnv, configYaml, caddyfile, judge0 });
+      const res = await api.updateConfig({ appEnv, configYaml, caddyfile, citron, citronLanguages });
       setMessage({ type: "success", text: "Configuration saved successfully." });
       
       const restartAction = (res as any)?.restartAction;
@@ -82,7 +84,8 @@ export default function EnvironmentPage() {
           <TabsTrigger value="appenv">app.env</TabsTrigger>
           <TabsTrigger value="config">config.yaml</TabsTrigger>
           <TabsTrigger value="caddy">Caddyfile</TabsTrigger>
-          <TabsTrigger value="judge0">Judge0 Config</TabsTrigger>
+          <TabsTrigger value="citron">Citron</TabsTrigger>
+          <TabsTrigger value="citron-languages">Languages</TabsTrigger>
         </TabsList>
 
         <TabsContent value="appenv">
@@ -127,14 +130,30 @@ export default function EnvironmentPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="judge0">
+        <TabsContent value="citron">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Judge0 code execution engine configuration file.
+              Citron execution engine configuration: resource limits, concurrency and
+              sandboxing.
             </p>
             <Textarea
-              value={judge0}
-              onChange={(e) => setJudge0(e.target.value)}
+              value={citron}
+              onChange={(e) => setCitron(e.target.value)}
+              rows={10}
+              className="text-xs font-mono"
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="citron-languages">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Languages Citron can run. Adding one also requires its toolchain in the
+              Citron image.
+            </p>
+            <Textarea
+              value={citronLanguages}
+              onChange={(e) => setCitronLanguages(e.target.value)}
               rows={10}
               className="text-xs font-mono"
             />

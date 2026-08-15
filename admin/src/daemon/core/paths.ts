@@ -19,7 +19,8 @@ export function getPaths(): Paths {
   const envFile = existsSync(appEnvPath) ? appEnvPath : (existsSync(join(root, ".env")) ? join(root, ".env") : appEnvPath);
   const configFile = join(configDir, "config.yaml");
   const caddyFile = join(configDir, "Caddyfile");
-  const judge0File = join(configDir, "judge0.conf");
+  const citronConfFile = join(configDir, "citron.conf");
+  const citronLanguagesFile = join(configDir, "languages.toml");
 
   return {
     root,
@@ -34,7 +35,8 @@ export function getPaths(): Paths {
     envFile,
     configFile,
     caddyFile,
-    judge0File,
+    citronConfFile,
+    citronLanguagesFile,
   };
 }
 
@@ -44,12 +46,12 @@ export function getComposeConfig() {
 
   const appDev = join(baseDir, "docker/app/docker-compose.dev.yaml");
   const appProd = join(baseDir, "docker/app/docker-compose.yaml");
-  const judgeDev = join(baseDir, "docker/judge0/docker-compose.dev.yaml");
-  const judgeProd = join(baseDir, "docker/judge0/docker-compose.yaml");
+  const citronDev = join(baseDir, "docker/citron/docker-compose.dev.yaml");
+  const citronProd = join(baseDir, "docker/citron/docker-compose.yaml");
 
   return {
     app: process.env.POMELO_APP_COMPOSE ?? (existsSync(appDev) ? appDev : appProd),
-    judge: process.env.POMELO_JUDGE0_COMPOSE ?? (existsSync(judgeDev) ? judgeDev : judgeProd),
+    citron: process.env.POMELO_CITRON_COMPOSE ?? (existsSync(citronDev) ? citronDev : citronProd),
     project: process.env.POMELO_DOCKER_PROJECT ?? "pomelo",
   };
 }

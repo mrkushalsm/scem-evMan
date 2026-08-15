@@ -19,9 +19,9 @@ export default function SetupPage() {
   const [mongoTesting, setMongoTesting] = useState(false);
   const [mongoTestMsg, setMongoTestMsg] = useState<{type: "success" | "error", text: string} | null>(null);
 
-  const [judgeMode, setJudgeMode] = useState<"internal" | "external">("internal");
-  const [judgeUrl, setJudgeUrl] = useState("http://judge0-server:2358");
-  const [judgeSaving, setJudgeSaving] = useState(false);
+  const [citronMode, setCitronMode] = useState<"internal" | "external">("internal");
+  const [citronUrl, setCitronUrl] = useState("http://citron:2358");
+  const [citronSaving, setCitronSaving] = useState(false);
 
   const [domain, setDomain] = useState("localhost");
   const [protocol, setProtocol] = useState<"http" | "https">("http");
@@ -43,13 +43,13 @@ export default function SetupPage() {
       } catch (e) {}
 
       if (env.MONGODB_URI) setMongoUri(env.MONGODB_URI);
-      if (env.JUDGE0_URL) setJudgeUrl(env.JUDGE0_URL);
+      if (env.CITRON_URL) setCitronUrl(env.CITRON_URL);
 
       if (cfgYaml.infrastructure?.database?.mode) {
         setMongoMode(cfgYaml.infrastructure.database.mode);
       }
-      if (cfgYaml.infrastructure?.judge0?.mode) {
-        setJudgeMode(cfgYaml.infrastructure.judge0.mode);
+      if (cfgYaml.infrastructure?.citron?.mode) {
+        setCitronMode(cfgYaml.infrastructure.citron.mode);
       }
       if (cfgYaml.app?.domain) setDomain(cfgYaml.app.domain);
       if (cfgYaml.app?.protocol) setProtocol(cfgYaml.app.protocol);
@@ -105,8 +105,8 @@ export default function SetupPage() {
       case "restart-caddy":
         await api.restart("caddy-restart");
         break;
-      case "restart-judge":
-        await api.restart("judge");
+      case "restart-citron":
+        await api.restart("citron");
         break;
       // "none" — nothing to do
     }
@@ -163,14 +163,14 @@ export default function SetupPage() {
     setMongoTesting(false);
   }
 
-  async function handleSaveJudge() {
-    setJudgeSaving(true);
+  async function handleSaveCitron() {
+    setCitronSaving(true);
     try {
-      const newEnv = updateEnvContent(config?.appEnv || "", { JUDGE0_URL: judgeUrl });
+      const newEnv = updateEnvContent(config?.appEnv || "", { CITRON_URL: citronUrl });
       const newYaml = updateYaml(config?.configYaml || "", (doc) => {
         if (!doc.infrastructure) doc.infrastructure = {};
-        if (!doc.infrastructure.judge0) doc.infrastructure.judge0 = {};
-        doc.infrastructure.judge0.mode = judgeMode;
+        if (!doc.infrastructure.citron) doc.infrastructure.citron = {};
+        doc.infrastructure.citron.mode = citronMode;
       });
       const result = await api.updateConfig({ appEnv: newEnv, configYaml: newYaml });
       await loadConfig();
@@ -179,7 +179,7 @@ export default function SetupPage() {
       console.error(err);
       window.dispatchEvent(new CustomEvent("action-error", { detail: err.message || String(err) }));
     }
-    setJudgeSaving(false);
+    setCitronSaving(false);
   }
 
   async function handleSaveDomain() {
@@ -279,43 +279,43 @@ export default function SetupPage() {
 
         <Separator />
 
-        {/* Judge0 Section */}
+        {/* Citron Section */}
         <section className="space-y-6">
           <div className="flex items-center gap-2">
             <Code className="h-5 w-5" />
-            <h3 className="text-lg font-medium">Judge0 Engine</h3>
+            <h3 className="text-lg font-medium">Citron Execution Engine</h3>
           </div>
           <div className="pl-7 space-y-5">
-            <RadioGroup value={judgeMode} onValueChange={(v) => setJudgeMode(v as "internal" | "external")} className="gap-4">
+            <RadioGroup value={citronMode} onValueChange={(v) => setCitronMode(v as "internal" | "external")} className="gap-4">
               <div className="flex items-start gap-3">
                 <RadioGroupItem value="internal" id="judge-self" className="mt-0.5" />
                 <div>
                   <Label htmlFor="judge-self" className="cursor-pointer">Self-hosted (Docker)</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">Runs Judge0 server and workers in Docker. Requires privileged mode.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Runs Citron in Docker alongside the app. Sandboxed, and not privileged.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <RadioGroupItem value="external" id="judge-ext" className="mt-0.5" />
                 <div>
-                  <Label htmlFor="judge-ext" className="cursor-pointer">External Judge0</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">Connect to a separately hosted Judge0 instance.</p>
+                  <Label htmlFor="judge-ext" className="cursor-pointer">External Citron</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">Connect to a separately hosted Citron instance.</p>
                 </div>
               </div>
             </RadioGroup>
-            {judgeMode === "external" && (
+            {citronMode === "external" && (
               <div className="space-y-2">
-                <Label htmlFor="judge-url">Judge0 URL</Label>
+                <Label htmlFor="judge-url">Citron URL</Label>
                 <Input
                   id="judge-url"
-                  value={judgeUrl}
-                  onChange={(e) => setJudgeUrl(e.target.value)}
-                  placeholder="https://judge0.example.com:2358"
+                  value={citronUrl}
+                  onChange={(e) => setCitronUrl(e.target.value)}
+                  placeholder="https://citron.example.com:2358"
                   className="font-mono text-xs"
                 />
               </div>
             )}
-            <Button onClick={handleSaveJudge} disabled={judgeSaving}>
-              {judgeSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button onClick={handleSaveCitron} disabled={citronSaving}>
+              {citronSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Save & Restart
             </Button>
           </div>

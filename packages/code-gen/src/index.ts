@@ -1,11 +1,13 @@
 import { JudgePython } from "./python/JudgePython";
 import { JudgeC } from "./c/JudgeC";
+import { JudgeCpp } from "./cpp/JudgeCpp";
 import { JudgeJava } from "./java/JudgeJava";
 import { Judge } from "./types";
 
 const judges: Record<string, () => Judge> = {
   python: () => new JudgePython(),
   c: () => new JudgeC(),
+  cpp: () => new JudgeCpp(),
   java: () => new JudgeJava(),
 };
 

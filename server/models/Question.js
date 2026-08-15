@@ -28,6 +28,7 @@ const questionSchema = new mongoose.Schema({
   outputFormat: String,
   boilerplateCode: {
     c: String,
+    cpp: String,
     java: String,
     python: String,
   },

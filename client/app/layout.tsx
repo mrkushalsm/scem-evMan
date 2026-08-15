@@ -14,12 +14,12 @@ export const metadata: Metadata = {
     default: "Pomelo | Online Coding Contest & Assessment Platform",
     template: "%s | Pomelo",
   },
-  description: "Pomelo is a lightweight, modern, self-hosted coding contest platform with real-time code execution, evaluation, and leaderboard statistics powered by Judge0 and Next.js.",
+  description: "Pomelo is a lightweight, modern, self-hosted coding contest platform with real-time code execution, evaluation, and leaderboard statistics powered by Citron and Next.js.",
   keywords: [
     "coding contest",
     "programming competition",
     "online judge",
-    "judge0",
+    "citron",
     "next.js",
     "monaco editor",
     "hackathon platform",
@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: clientUrl,
     title: "Pomelo | Online Coding Contest Platform",
-    description: "Lightweight, modern coding contest platform with real-time code execution via Judge0.",
+    description: "Lightweight, modern coding contest platform with real-time code execution via Citron.",
     siteName: "Pomelo",
   },
   twitter: {
     card: "summary_large_image",
     title: "Pomelo | Online Coding Contest Platform",
-    description: "Lightweight, modern coding contest platform with real-time code execution via Judge0.",
+    description: "Lightweight, modern coding contest platform with real-time code execution via Citron.",
   },
 };
 

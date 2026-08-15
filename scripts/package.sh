@@ -55,7 +55,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   echo "  client/.next/      Next.js standalone build"
   echo "  client/public/     Client static assets"
   echo "  docker/            Docker Compose files"
-  echo "  config/            Caddy & Judge0 configs"
+  echo "  config/            Caddy & Citron configs"
   echo "  server/Dockerfile  Production Dockerfiles"
   echo "  client/Dockerfile"
   echo ""
@@ -159,15 +159,16 @@ rm -f "$PKG_DIR/client/.next/standalone/client/.env"*
 
 # --- Docker Compose files ---
 mkdir -p "$PKG_DIR/docker/app"
-mkdir -p "$PKG_DIR/docker/judge0"
+mkdir -p "$PKG_DIR/docker/citron"
 cp docker/app/docker-compose.yaml    "$PKG_DIR/docker/app/"
-cp docker/judge0/docker-compose.yaml "$PKG_DIR/docker/judge0/"
+cp docker/citron/docker-compose.yaml "$PKG_DIR/docker/citron/"
 
 # --- Config defaults ---
 mkdir -p "$PKG_DIR/config/caddy"
-mkdir -p "$PKG_DIR/config/judge0"
+mkdir -p "$PKG_DIR/config/citron"
 cp config/caddy/Caddyfile      "$PKG_DIR/config/caddy/"
-cp config/judge0/judge0.conf   "$PKG_DIR/config/judge0/"
+cp config/citron/citron.conf     "$PKG_DIR/config/citron/"
+cp config/citron/languages.toml  "$PKG_DIR/config/citron/"
 
 # --- Root-level files ---
 cp .dockerignore  "$PKG_DIR/"

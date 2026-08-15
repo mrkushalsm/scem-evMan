@@ -5,8 +5,8 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "start": "turbo run start",
-    "dev:infra": "docker compose -f docker/app/docker-compose.dev.yaml -f docker/judge0/docker-compose.dev.yaml --project-directory . up mongo judge0-server judge0-workers -d --remove-orphans",
-    "dev:down": "docker compose -f docker/app/docker-compose.dev.yaml -f docker/judge0/docker-compose.dev.yaml --project-directory . down --remove-orphans",
+    "dev:infra": "docker compose -f docker/app/docker-compose.dev.yaml -f docker/citron/docker-compose.dev.yaml --project-directory . up mongo citron -d --remove-orphans",
+    "dev:down": "docker compose -f docker/app/docker-compose.dev.yaml -f docker/citron/docker-compose.dev.yaml --project-directory . down --remove-orphans",
     "dev": "node scripts/dev.mjs",
     "build": "turbo run build",
     "test": "turbo run test",

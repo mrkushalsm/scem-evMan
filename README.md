@@ -7,7 +7,7 @@
 </div>
 
 ## Description
-Pomelo is a self-hosted platform designed to manage programming contests, technical assessments, and hackathons. It integrates a Next.js frontend, an Express backend, and the Judge0 code execution engine to provide a complete environment for coding events. The platform is designed for privacy and control, allowing organizers to retain full data sovereignty while operating their own infrastructure.
+Pomelo is a self-hosted platform designed to manage programming contests, technical assessments, and hackathons. It integrates a Next.js frontend, an Express backend, and the Citron sandboxed code execution engine to provide a complete environment for coding events. The platform is designed for privacy and control, allowing organizers to retain full data sovereignty while operating their own infrastructure.
 
 The system utilizes an automated deployment model via a custom daemon and CLI, simplifying the provisioning of underlying services such as Docker containers and reverse proxies. It provides an administrative interface for managing application state, environment configurations, and container health.
 
