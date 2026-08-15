@@ -54,9 +54,16 @@ const submissionSchema = new mongoose.Schema({
         expectedOutput: String,
         actualOutput: String,
         error: String,
+        // The engine's verdict for this test case, e.g. "Wrong Answer" or
+        // "Runtime Error (SIGSEGV)". More specific than the submission-level status
+        // above, which is normalised to the enum.
+        status: String,
+        executionTime: Number, // CPU time in milliseconds
+        memoryUsed: Number, // peak memory in KB
       }],
       default: undefined
     },
+    // Totals across the submission's test cases.
     executionTime: Number, // in milliseconds
     memoryUsed: Number, // in KB
     score: {
