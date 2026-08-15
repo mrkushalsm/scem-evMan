@@ -1,7 +1,6 @@
 const Contest = require('../models/Contest');
 const User = require('../models/User');
 const Question = require('../models/Question');
-const { languageMap } = require('../utils/languageMap');
 const { getJudge } = require('@pomelo/code-gen');
 const { formatTestCaseInput } = require('../utils/formatTestCaseInput');
 

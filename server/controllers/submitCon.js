@@ -1,7 +1,7 @@
 const Submission = require("../models/Submissions");
 const Question = require("../models/Question");
 const Contest = require("../models/Contest");
-const { languageMap } = require("../utils/languageMap");
+const { languageIds } = require("../utils/languages");
 const { getJudge } = require("@pomelo/code-gen");
 
 const resolveContestFromRequest = async (req) => {
@@ -25,38 +25,85 @@ const removeTrailingLineCommands = (output) => {
     return output.replace(/\s+$/g, '');
 };
 
-// Judge0's own CPU limit is ~15s (config/judge0/judge0.conf), plus compile time and
-// queueing headroom — must stay well above that or correct-but-slow submissions
-// (Java especially: JVM startup + javac) get killed and shown as failed.
-const JUDGE0_TIMEOUT_MS = 45000;
+// Citron bounds a submission itself: up to 15s waiting for a slot plus 30s of
+// execution. This ceiling only has to sit above that so citron's own deadline fires
+// first and returns structured per-testcase results, instead of us aborting with
+// nothing to show the user.
+const CITRON_TIMEOUT_MS = 60000;
 
-// Per-language cap on concurrent in-flight Judge0 requests. Languages not listed run
-// fully parallel (one request per test case). Add an entry here for any language whose
-// runtime is heavy enough that firing every test case at once causes contention
-// (JVM startup, GC/JIT threads, etc.) — Java is the current known case.
-const LANGUAGE_CONCURRENCY_LIMITS = {
-    java: 5,
-};
+// Citron sheds load with 503 rather than queueing without limit, so a busy engine is
+// a retryable condition rather than a failed submission.
+const CITRON_RETRY_DELAYS_MS = [500, 1500];
 
-// Runs fn over items with at most `limit` in flight at once, preserving item order in the result.
-const mapWithConcurrency = async (items, limit, fn) => {
-    const results = new Array(items.length);
-    let cursor = 0;
-    const worker = async () => {
-        while (cursor < items.length) {
-            const index = cursor++;
-            results[index] = await fn(items[index], index);
+const decodeBase64 = (value) => (value ? Buffer.from(value, "base64").toString("utf-8") : "");
+
+// Serializes one test case's input into the stdin format the generated code reads:
+// values in declared order, arrays as a length followed by their elements.
+const buildStdin = (question, tc) => {
+    if (typeof tc.input === "object" && tc.input !== null) {
+        const values = [];
+        for (const inputVar of (question.inputVariables || [])) {
+            const value = tc.input[inputVar.variable];
+            if (Array.isArray(value)) {
+                values.push(value.length);
+                values.push(...value);
+            } else {
+                values.push(value);
+            }
         }
-    };
-    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-    return results;
+        return values.join(" ");
+    }
+    if (typeof tc.input === "string") {
+        return tc.input.trim().replace(/,/g, " ").replace(/\s+/g, " ");
+    }
+    return String(tc.input ?? "");
 };
 
-// Common logic for executing code against test cases
-const executeTestCases = async ({ question, code, language, testCases, judge0Id, forceVisible = false, onProgress }) => {
-    const judge0Url = process.env.JUDGE0_URL || 'http://localhost:2358';
+// Citron reports verdicts like "Runtime Error (SIGSEGV)" and "Memory Limit
+// Exceeded", which are more specific than the Submission schema's enum. Collapse
+// them onto a value the schema accepts without losing the distinction between a
+// wrong answer, a timeout and a crash.
+const normalizeSubmissionStatus = (status) => {
+    if (!status) return "Wrong Answer";
+    if (status === "Accepted") return "Accepted";
+    if (status.includes("Compilation")) return "Compilation Error";
+    if (status.includes("Time Limit")) return "Time Limit Exceeded";
+    if (status.startsWith("Runtime Error") || status.includes("Internal Error")) return "Runtime Error";
+    return "Wrong Answer";
+};
 
-    // Wrap code
+// Posts a whole submission to citron, retrying only while it reports overload.
+const postSubmission = async (payload) => {
+    const citronUrl = process.env.CITRON_URL || "http://localhost:2358";
+    const headers = { "Content-Type": "application/json" };
+    if (process.env.CITRON_TOKEN) headers["X-Judge-Token"] = process.env.CITRON_TOKEN;
+
+    for (let attempt = 0; ; attempt++) {
+        const response = await fetch(`${citronUrl}/submissions?base64_encoded=true`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(CITRON_TIMEOUT_MS),
+        });
+
+        if (response.status === 503 && attempt < CITRON_RETRY_DELAYS_MS.length) {
+            await new Promise((resolve) => setTimeout(resolve, CITRON_RETRY_DELAYS_MS[attempt]));
+            continue;
+        }
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            const error = new Error(body.error || `citron returned ${response.status}`);
+            error.citronStatus = response.status;
+            throw error;
+        }
+        return response.json();
+    }
+};
+
+// Executes every test case of one submission in a single request. Citron compiles
+// once and runs the test cases concurrently under its own resource limits, and
+// returns a result for each one regardless of how the earlier ones fared.
+const executeTestCases = async ({ question, code, language, testCases, languageId, forceVisible = false, onProgress }) => {
     let wrappedCode = code;
     try {
         const judge = getJudge(language.toLowerCase());
@@ -72,79 +119,76 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
         console.warn(`Could not wrap code for ${language}, using original code:`, err.message);
     }
 
-    let completed = 0;
-    const concurrency = LANGUAGE_CONCURRENCY_LIMITS[language.toLowerCase()] || testCases.length;
+    const prepared = testCases.map((tc) => ({
+        stdin: buildStdin(question, tc),
+        expectedOutput: removeTrailingLineCommands(String(tc.output ?? "").trim()),
+        isVisible: forceVisible || tc.isVisible,
+    }));
 
-    const results = await mapWithConcurrency(testCases, concurrency, async (tc, index) => {
-        // Prepare input
-        let input = '';
-        if (typeof tc.input === 'object' && tc.input !== null) {
-            const values = [];
-            for (const inputVar of (question.inputVariables || [])) {
-                const value = tc.input[inputVar.variable];
-                if (Array.isArray(value)) {
-                    values.push(value.length);
-                    values.push(...value);
-                } else {
-                    values.push(value);
-                }
-            }
-            input = values.join(' ');
-        } else if (typeof tc.input === 'string') {
-            input = tc.input.trim().replace(/,/g, ' ').replace(/\s+/g, ' ');
-        } else {
-            input = String(tc.input ?? "");
+    // A failure before any test case runs still has to produce one entry per test
+    // case, because scoring and the client both count against the total.
+    const failAll = (status, error) => prepared.map((tc, index) => ({
+        testCase: index + 1,
+        passed: false,
+        status,
+        error,
+        isVisible: tc.isVisible,
+    }));
+
+    let submission;
+    try {
+        submission = await postSubmission({
+            language_id: languageId,
+            source_code: Buffer.from(wrappedCode).toString("base64"),
+            testcases: prepared.map((tc) => ({
+                stdin: Buffer.from(tc.stdin).toString("base64"),
+                expected_output: Buffer.from(tc.expectedOutput).toString("base64"),
+            })),
+        });
+    } catch (err) {
+        if (err.name === "TimeoutError") {
+            return failAll("Time Limit Exceeded", "The execution engine did not respond in time");
         }
+        if (err.citronStatus === 503) {
+            return failAll("System Error", "The execution engine is busy. Please try again in a moment.");
+        }
+        return failAll("System Error", err.message);
+    }
 
-        const expectedOutput = removeTrailingLineCommands(String(tc.output ?? "").trim());
-        const base64SourceCode = Buffer.from(wrappedCode).toString('base64');
-        const base64Input = Buffer.from(input).toString('base64');
+    const compileOutput = decodeBase64(submission.compile?.output);
+    const compileFailed = submission.compile && !submission.compile.skipped && !submission.compile.success;
 
-        let resultEntry;
-        try {
-            const response = await fetch(`${judge0Url}/submissions?base64_encoded=true&wait=true`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    source_code: base64SourceCode,
-                    language_id: judge0Id,
-                    stdin: base64Input,
-                    expected_output: Buffer.from(expectedOutput).toString('base64'),
-                }),
-                signal: AbortSignal.timeout(JUDGE0_TIMEOUT_MS),
-            });
-            const result = await response.json();
-            const isPassed = result.status && result.status.id === 3;
-
-            const decodedStdout = result.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8') : '';
-            const decodedStderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : '';
-            const decodedCompileOutput = result.compile_output ? Buffer.from(result.compile_output, 'base64').toString('utf-8') : '';
-
-            resultEntry = {
-                testCase: index + 1,
-                passed: isPassed,
-                input: input,
-                expectedOutput: expectedOutput,
-                actualOutput: removeTrailingLineCommands(decodedStdout || ""),
-                error: decodedStderr || decodedCompileOutput || (result.status ? result.status.description : "Unknown Error"),
-                status: result.status ? result.status.description : "Unknown",
-                isVisible: forceVisible || tc.isVisible
-            };
-        } catch (err) {
-            resultEntry = {
+    const results = prepared.map((tc, index) => {
+        const result = (submission.testcases || []).find((r) => r.index === index);
+        if (!result) {
+            return {
                 testCase: index + 1,
                 passed: false,
-                status: err.name === "TimeoutError" ? "Time Limit Exceeded" : "System Error",
-                error: err.name === "TimeoutError" ? "Judge0 did not respond in time" : err.message,
-                isVisible: tc.isVisible
+                status: compileFailed ? "Compilation Error" : "System Error",
+                error: compileFailed ? compileOutput : "No result was returned for this test case",
+                isVisible: tc.isVisible,
             };
         }
 
-        completed += 1;
-        onProgress?.(completed, testCases.length);
-        return resultEntry;
+        const status = result.status?.description || "Unknown";
+        const stdout = decodeBase64(result.stdout);
+        const stderr = decodeBase64(result.stderr);
+
+        return {
+            testCase: index + 1,
+            passed: result.status?.id === 3,
+            input: tc.stdin,
+            expectedOutput: tc.expectedOutput,
+            actualOutput: removeTrailingLineCommands(stdout),
+            error: stderr || compileOutput || status,
+            status,
+            executionTime: result.cpu_time_ms ?? result.wall_time_ms,
+            memoryUsed: result.memory_kb,
+            isVisible: tc.isVisible,
+        };
     });
 
+    onProgress?.(results.length, results.length);
     return results;
 };
 
@@ -181,8 +225,8 @@ const runCode = async (req, res, next) => {
             return res.status(403).json({ success: false, error: "Question does not belong to contest" });
         }
 
-        const judge0Id = languageMap[language.toLowerCase()];
-        if (!judge0Id) return res.status(400).json({ success: false, error: "Unsupported language" });
+        const languageId = languageIds[language.toLowerCase()];
+        if (!languageId) return res.status(400).json({ success: false, error: "Unsupported language" });
 
         const visibleTestCases = (Array.isArray(question.testcases) ? question.testcases : []).filter(tc => tc.isVisible);
 
@@ -198,13 +242,17 @@ const runCode = async (req, res, next) => {
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no"
         });
+        // The whole submission now returns in one response, so nothing would reach the
+        // client until it completes. This opening frame keeps intermediate proxies from
+        // treating the connection as idle, and gives the UI its total immediately.
+        res.write(JSON.stringify({ type: "progress", completed: 0, total: testToRun.length }) + "\n");
 
         const results = await executeTestCases({
             question,
             code,
             language,
             testCases: testToRun,
-            judge0Id,
+            languageId,
             forceVisible: true,
             onProgress: (completed, total) => {
                 res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
@@ -263,23 +311,28 @@ const submitCode = async (req, res, next) => {
             return res.status(403).json({ error: "Question does not belong to contest" });
         }
 
-        const judge0Id = languageMap[language.toLowerCase()];
-        if (!judge0Id) return res.status(400).json({ error: "Unsupported language" });
+        const languageId = languageIds[language.toLowerCase()];
+        if (!languageId) return res.status(400).json({ error: "Unsupported language" });
+
+        // Submit runs against ALL test cases for scoring
+        const allTestCases = Array.isArray(question.testcases) ? question.testcases : [];
 
         res.writeHead(200, {
             "Content-Type": "application/x-ndjson",
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no"
         });
+        // The whole submission now returns in one response, so nothing would reach the
+        // client until it completes. This opening frame keeps intermediate proxies from
+        // treating the connection as idle, and gives the UI its total immediately.
+        res.write(JSON.stringify({ type: "progress", completed: 0, total: allTestCases.length }) + "\n");
 
-        // Submit runs against ALL test cases for scoring
-        const allTestCases = Array.isArray(question.testcases) ? question.testcases : [];
         const results = await executeTestCases({
             question,
             code,
             language,
             testCases: allTestCases,
-            judge0Id,
+            languageId,
             onProgress: (completed, total) => {
                 res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
             }
@@ -289,12 +342,18 @@ const submitCode = async (req, res, next) => {
         const totalCount = allTestCases.length;
         const score = totalCount > 0 ? (passedCount / totalCount) * (question.marks || 0) : 0;
 
+        // The worst test case decides the submission. Runtime errors are now recorded
+        // as such rather than collapsed into "Wrong Answer".
         let overallStatus = "Accepted";
         if (passedCount < totalCount) {
-            if (results.some(r => r.status?.includes("Compilation"))) overallStatus = "Compilation Error";
-            else if (results.some(r => r.status?.includes("Time Limit"))) overallStatus = "Time Limit Exceeded";
-            else overallStatus = "Wrong Answer";
+            const ranking = ["Compilation Error", "Time Limit Exceeded", "Runtime Error", "Wrong Answer"];
+            const seen = results.map(r => normalizeSubmissionStatus(r.status));
+            overallStatus = ranking.find(status => seen.includes(status)) || "Wrong Answer";
         }
+
+        // Slowest and heaviest test case: what the submission actually cost to run.
+        const executionTime = results.reduce((max, r) => Math.max(max, r.executionTime || 0), 0);
+        const memoryUsed = results.reduce((max, r) => Math.max(max, r.memoryUsed || 0), 0);
 
         const entry = {
             question: questionId,
@@ -303,6 +362,8 @@ const submitCode = async (req, res, next) => {
             status: overallStatus,
             score,
             testCaseResults: results,
+            executionTime,
+            memoryUsed,
             submittedAt: new Date()
         };
 
