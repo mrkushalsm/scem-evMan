@@ -1,9 +1,6 @@
 const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
-const { Agent, setGlobalDispatcher } = require("undici");
-
-setGlobalDispatcher(new Agent({ connections: 50 }));
 
 const app = express();
 
