@@ -25,25 +25,26 @@ const removeTrailingLineCommands = (output) => {
     return output.replace(/\s+$/g, '');
 };
 
-// Citron bounds a submission itself: up to 15s waiting for a slot plus 30s of
-// execution. This ceiling only has to sit above that so citron's own deadline fires
-// first and returns structured per-testcase results, instead of us aborting with
-// nothing to show the user.
+// Sits above citron's own 15s queue + 30s execution deadline so citron times out first.
 const CITRON_TIMEOUT_MS = 60000;
 
-// Citron sheds load with 503 rather than queueing without limit, so a busy engine is
-// a retryable condition rather than a failed submission.
+// Citron returns 503 when busy instead of queueing, so that's worth a retry.
 const CITRON_RETRY_DELAYS_MS = [500, 1500];
 
 const decodeBase64 = (value) => (value ? Buffer.from(value, "base64").toString("utf-8") : "");
 
-// Serializes one test case's input into the stdin format the generated code reads:
-// values in declared order, arrays as a length followed by their elements.
+// 64KB comfortably covers any real solution.
+const MAX_CODE_LENGTH = 65536;
+
+// Serializes one test case's input into stdin: values in declared order, arrays as length + elements.
 const buildStdin = (question, tc) => {
     if (typeof tc.input === "object" && tc.input !== null) {
         const values = [];
         for (const inputVar of (question.inputVariables || [])) {
             const value = tc.input[inputVar.variable];
+            if (value === undefined) {
+                throw new Error(`test case is missing a value for "${inputVar.variable}"`);
+            }
             if (Array.isArray(value)) {
                 values.push(value.length);
                 values.push(...value);
@@ -59,16 +60,14 @@ const buildStdin = (question, tc) => {
     return String(tc.input ?? "");
 };
 
-// Citron reports verdicts like "Runtime Error (SIGSEGV)" and "Memory Limit
-// Exceeded", which are more specific than the Submission schema's enum. Collapse
-// them onto a value the schema accepts without losing the distinction between a
-// wrong answer, a timeout and a crash.
+// Collapses citron's specific verdicts (e.g. "Runtime Error (SIGSEGV)") onto the schema's enum.
 const normalizeSubmissionStatus = (status) => {
-    if (!status) return "Wrong Answer";
+    if (!status || status === "Unknown") return "System Error";
     if (status === "Accepted") return "Accepted";
     if (status.includes("Compilation")) return "Compilation Error";
     if (status.includes("Time Limit")) return "Time Limit Exceeded";
     if (status.startsWith("Runtime Error") || status.includes("Internal Error")) return "Runtime Error";
+    if (status.includes("System Error")) return "System Error";
     return "Wrong Answer";
 };
 
@@ -100,11 +99,37 @@ const postSubmission = async (payload) => {
     }
 };
 
-// Executes every test case of one submission in a single request. Citron compiles
-// once and runs the test cases concurrently under its own resource limits, and
-// returns a result for each one regardless of how the earlier ones fared.
+// Runs every test case of one submission in a single citron request.
 const executeTestCases = async ({ question, code, language, testCases, languageId, forceVisible = false, onProgress }) => {
-    let wrappedCode = code;
+    // One entry per test case even on early failure, so scoring/client counts stay in sync.
+    const failAllRaw = (status, error) => testCases.map((tc, index) => ({
+        testCase: index + 1,
+        passed: false,
+        status,
+        error,
+        isVisible: forceVisible || tc.isVisible,
+    }));
+
+    let prepared;
+    try {
+        prepared = testCases.map((tc) => ({
+            stdin: buildStdin(question, tc),
+            expectedOutput: removeTrailingLineCommands(String(tc.output ?? "").trim()),
+            isVisible: forceVisible || tc.isVisible,
+        }));
+    } catch (err) {
+        return failAllRaw("System Error", `This question's test data is misconfigured: ${err.message}`);
+    }
+
+    const failAll = (status, error) => prepared.map((tc, index) => ({
+        testCase: index + 1,
+        passed: false,
+        status,
+        error,
+        isVisible: tc.isVisible,
+    }));
+
+    let wrappedCode;
     try {
         const judge = getJudge(language.toLowerCase());
         const problemConfig = {
@@ -116,24 +141,8 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
         };
         wrappedCode = judge.wrapCode(code, problemConfig);
     } catch (err) {
-        console.warn(`Could not wrap code for ${language}, using original code:`, err.message);
+        return failAll("System Error", `Could not prepare code for execution: ${err.message}`);
     }
-
-    const prepared = testCases.map((tc) => ({
-        stdin: buildStdin(question, tc),
-        expectedOutput: removeTrailingLineCommands(String(tc.output ?? "").trim()),
-        isVisible: forceVisible || tc.isVisible,
-    }));
-
-    // A failure before any test case runs still has to produce one entry per test
-    // case, because scoring and the client both count against the total.
-    const failAll = (status, error) => prepared.map((tc, index) => ({
-        testCase: index + 1,
-        passed: false,
-        status,
-        error,
-        isVisible: tc.isVisible,
-    }));
 
     let submission;
     try {
@@ -174,9 +183,14 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
         const stdout = decodeBase64(result.stdout);
         const stderr = decodeBase64(result.stderr);
 
+        const passed = result.status?.id === 3;
+        if (passed !== (normalizeSubmissionStatus(status) === "Accepted")) {
+            console.warn(`citron status mismatch on test ${index + 1}: id=${result.status?.id} description="${status}"`);
+        }
+
         return {
             testCase: index + 1,
-            passed: result.status?.id === 3,
+            passed,
             input: tc.stdin,
             expectedOutput: tc.expectedOutput,
             actualOutput: removeTrailingLineCommands(stdout),
@@ -190,6 +204,39 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
 
     onProgress?.(results.length, results.length);
     return results;
+};
+
+// Persists one question's entry atomically, avoiding a read-then-write race between concurrent submissions.
+const saveSubmissionEntry = async (contestId, userId, questionId, entry) => {
+    const updateExisting = () => Submission.findOneAndUpdate(
+        { contest: contestId, user: userId, "submissions.question": questionId },
+        { $set: { "submissions.$": entry } },
+        { new: true, runValidators: true }
+    );
+
+    let doc = await updateExisting();
+
+    if (!doc) {
+        try {
+            doc = await Submission.findOneAndUpdate(
+                { contest: contestId, user: userId },
+                { $push: { submissions: entry } },
+                { new: true, upsert: true, runValidators: true }
+            );
+        } catch (err) {
+            if (err.code !== 11000) throw err;
+            // Lost the create race — retry as an update (or append) now that the doc exists.
+            doc = await updateExisting() || await Submission.findOneAndUpdate(
+                { contest: contestId, user: userId },
+                { $push: { submissions: entry } },
+                { new: true, runValidators: true }
+            );
+        }
+    }
+
+    // ponytail: totalScore write can still race across different-question submits; self-heals next submit.
+    const totalScore = doc.submissions.reduce((acc, s) => acc + (s.score || 0), 0);
+    await Submission.updateOne({ _id: doc._id }, { $set: { totalScore } });
 };
 
 // @desc    Run code against visible test cases only
@@ -208,6 +255,10 @@ const runCode = async (req, res, next) => {
 
         if (typeof questionId !== "string") {
             return res.status(400).json({ success: false, error: "Invalid questionId" });
+        }
+
+        if (code.length > MAX_CODE_LENGTH) {
+            return res.status(400).json({ success: false, error: "Code exceeds maximum allowed length" });
         }
 
         const { contestId, contest } = await resolveContestFromRequest(req);
@@ -242,9 +293,7 @@ const runCode = async (req, res, next) => {
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no"
         });
-        // The whole submission now returns in one response, so nothing would reach the
-        // client until it completes. This opening frame keeps intermediate proxies from
-        // treating the connection as idle, and gives the UI its total immediately.
+        // Keeps proxies from treating the connection as idle while the batch runs.
         res.write(JSON.stringify({ type: "progress", completed: 0, total: testToRun.length }) + "\n");
 
         const results = await executeTestCases({
@@ -288,9 +337,7 @@ const submitCode = async (req, res, next) => {
 
         const userId = req.user.id || req.user._id || req.user.sub;
         const { contestId, contest } = await resolveContestFromRequest(req);
-        // contestId is validated by middleware if part of URL or body, but here middleware is usually mounted on /:id
-        // However, middleware checks req.params.id || req.body.contestId.
-        // So we can assume req.contest exists if the route uses the middleware.
+        // contestId is validated by validateContest middleware, mounted on /:id.
 
         if (!contestId || !questionId || !code || !language) {
             return res.status(400).json({ error: "Missing required fields" });
@@ -298,6 +345,10 @@ const submitCode = async (req, res, next) => {
 
         if (typeof questionId !== "string") {
             return res.status(400).json({ error: "Invalid questionId" });
+        }
+
+        if (code.length > MAX_CODE_LENGTH) {
+            return res.status(400).json({ error: "Code exceeds maximum allowed length" });
         }
 
         if (!contest) {
@@ -316,15 +367,16 @@ const submitCode = async (req, res, next) => {
 
         // Submit runs against ALL test cases for scoring
         const allTestCases = Array.isArray(question.testcases) ? question.testcases : [];
+        if (allTestCases.length === 0) {
+            return res.status(400).json({ error: "No test cases configured" });
+        }
 
         res.writeHead(200, {
             "Content-Type": "application/x-ndjson",
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no"
         });
-        // The whole submission now returns in one response, so nothing would reach the
-        // client until it completes. This opening frame keeps intermediate proxies from
-        // treating the connection as idle, and gives the UI its total immediately.
+        // Keeps proxies from treating the connection as idle while the batch runs.
         res.write(JSON.stringify({ type: "progress", completed: 0, total: allTestCases.length }) + "\n");
 
         const results = await executeTestCases({
@@ -342,11 +394,10 @@ const submitCode = async (req, res, next) => {
         const totalCount = allTestCases.length;
         const score = totalCount > 0 ? (passedCount / totalCount) * (question.marks || 0) : 0;
 
-        // The worst test case decides the submission. Runtime errors are now recorded
-        // as such rather than collapsed into "Wrong Answer".
+        // The worst test case decides the submission's overall status.
         let overallStatus = "Accepted";
         if (passedCount < totalCount) {
-            const ranking = ["Compilation Error", "Time Limit Exceeded", "Runtime Error", "Wrong Answer"];
+            const ranking = ["Compilation Error", "System Error", "Time Limit Exceeded", "Runtime Error", "Wrong Answer"];
             const seen = results.map(r => normalizeSubmissionStatus(r.status));
             overallStatus = ranking.find(status => seen.includes(status)) || "Wrong Answer";
         }
@@ -367,26 +418,7 @@ const submitCode = async (req, res, next) => {
             submittedAt: new Date()
         };
 
-        // Save submission atomically
-        const existingSubmission = await Submission.findOne({ contest: contestId, user: userId });
-        if (!existingSubmission) {
-            // First submission — create directly with the entry
-            await Submission.create({
-                contest: contestId,
-                user: userId,
-                submissions: [entry],
-                totalScore: score || 0
-            });
-        } else {
-            const existingIdx = existingSubmission.submissions.findIndex(s => s.question.toString() === questionId);
-            const updatedSubmissions = existingIdx > -1
-                ? existingSubmission.submissions.map((s, i) => i === existingIdx ? entry : s)
-                : [...existingSubmission.submissions, entry];
-            const totalScore = updatedSubmissions.reduce((acc, curr) => acc + (curr.score || 0), 0);
-            await Submission.findByIdAndUpdate(existingSubmission._id, {
-                $set: { submissions: updatedSubmissions, totalScore }
-            });
-        }
+        await saveSubmissionEntry(contestId, userId, questionId, entry);
 
         const clientResults = results.map(r => ({
             testCase: r.testCase,
@@ -492,6 +524,5 @@ const saveMCQ = async (req, res, next) => {
     }
 };
 
-// executeTestCases is exported so the execution path can be exercised directly
-// against a running engine, without standing up Express, Mongo and auth.
+// executeTestCases is exported to exercise the execution path without Express/Mongo/auth.
 module.exports = { saveMCQ, submitCode, runCode, executeTestCases };

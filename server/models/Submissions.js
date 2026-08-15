@@ -44,7 +44,7 @@ const submissionSchema = new mongoose.Schema({
     language: String,
     status: {
       type: String,
-      enum: ['Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compilation Error', 'Pending'],
+      enum: ['Accepted', 'Wrong Answer', 'Time Limit Exceeded', 'Runtime Error', 'Compilation Error', 'System Error', 'Pending'],
     },
     testCaseResults: {
       type: [{
@@ -54,9 +54,7 @@ const submissionSchema = new mongoose.Schema({
         expectedOutput: String,
         actualOutput: String,
         error: String,
-        // The engine's verdict for this test case, e.g. "Wrong Answer" or
-        // "Runtime Error (SIGSEGV)". More specific than the submission-level status
-        // above, which is normalised to the enum.
+        // Raw engine verdict, e.g. "Runtime Error (SIGSEGV)" — more specific than the enum above.
         status: String,
         executionTime: Number, // CPU time in milliseconds
         memoryUsed: Number, // peak memory in KB
