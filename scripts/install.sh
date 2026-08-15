@@ -131,7 +131,7 @@ if [[ "$ACTION" == "uninstall" ]]; then
     log_info "Stopping Docker containers and removing ephemeral volumes..."
     docker compose --project-name pomelo \
       -f "$APP_ROOT/app/docker/app/docker-compose.yaml" \
-      -f "$APP_ROOT/app/docker/judge0/docker-compose.yaml" \
+      -f "$APP_ROOT/app/docker/citron/docker-compose.yaml" \
       down -v >/dev/null 2>&1 || true
     log_success "Docker containers and ephemeral volumes removed."
   fi
@@ -558,16 +558,12 @@ if [[ ! -s "$APP_ROOT/config/app.env" ]]; then
   }
 
   AUTH_SECRET=$(gen_secret)
-  POSTGRES_PASSWORD=$(gen_secret)
-  REDIS_PASSWORD=$(gen_secret)
 
   cat > "$APP_ROOT/config/app.env" <<EOF
 # --- SECRETS & URIS ---
 AUTH_SECRET=${AUTH_SECRET}
 MONGODB_URI=${MONGO_URI}
-JUDGE0_URL=http://judge0-server:2358
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-REDIS_PASSWORD=${REDIS_PASSWORD}
+CITRON_URL=http://citron:2358
 EOF
 
   log_success "Secure app.env generated at ${DIM}$APP_ROOT/config/app.env${NC}"
@@ -592,7 +588,7 @@ ports:
 infrastructure:
   database:
     mode: "${MONGO_DB_MODE}"
-  judge0:
+  citron:
     mode: "internal"
 YAML_EOF
 fi
@@ -603,10 +599,15 @@ if [[ ! -f "$APP_ROOT/config/Caddyfile" ]] && [[ -f "$APP_ROOT/app/config/caddy/
   log_success "Default Caddyfile installed"
 fi
 
-# Copy default judge0.conf if not present
-if [[ ! -f "$APP_ROOT/config/judge0.conf" ]] && [[ -f "$APP_ROOT/app/config/judge0/judge0.conf" ]]; then
-  cp "$APP_ROOT/app/config/judge0/judge0.conf" "$APP_ROOT/config/judge0.conf"
-  log_success "Default judge0.conf installed"
+# Copy default Citron config if not present
+if [[ ! -f "$APP_ROOT/config/citron.conf" ]] && [[ -f "$APP_ROOT/app/config/citron/citron.conf" ]]; then
+  cp "$APP_ROOT/app/config/citron/citron.conf" "$APP_ROOT/config/citron.conf"
+  log_success "Default citron.conf installed"
+fi
+
+if [[ ! -f "$APP_ROOT/config/languages.toml" ]] && [[ -f "$APP_ROOT/app/config/citron/languages.toml" ]]; then
+  cp "$APP_ROOT/app/config/citron/languages.toml" "$APP_ROOT/config/languages.toml"
+  log_success "Default languages.toml installed"
 fi
 
 # ==============================================================================
