@@ -12,7 +12,7 @@ export async function runDaemon(argv: string[], moduleUrl: string) {
   if (args.host) process.env.POMELO_HOST = args.host;
   if (args.port) process.env.POMELO_PORT = String(args.port);
   if (args.appCompose) process.env.POMELO_APP_COMPOSE = args.appCompose;
-  if (args.judgeCompose) process.env.POMELO_JUDGE0_COMPOSE = args.judgeCompose;
+  if (args.citronCompose) process.env.POMELO_CITRON_COMPOSE = args.citronCompose;
 
   if (args.daemonize) {
     spawnDaemon(args, moduleUrl);
@@ -36,6 +36,11 @@ export async function runDaemon(argv: string[], moduleUrl: string) {
   const pidFile = join(paths.runtimeDir, "daemon.pid");
   writeFileSync(pidFile, String(process.pid));
   logger.info(`pomelod pid ${process.pid}`);
+
+  // One-shot: an upgraded install still has the previous engine's containers running,
+  // and the compose file that could stop them is gone.
+  const { cleanupLegacyEngine } = await import("./services/legacy-cleanup");
+  await cleanupLegacyEngine(paths, logger);
 
   const server = Bun.serve({
     hostname: paths.apiHost,

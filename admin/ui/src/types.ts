@@ -34,7 +34,8 @@ export interface ConfigSnapshot {
   appEnv: string;
   configYaml: string;
   caddyfile: string;
-  judge0: string;
+  citron: string;
+  citronLanguages: string;
 };
 
 export type StorageUsage = {

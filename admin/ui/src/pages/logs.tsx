@@ -12,10 +12,7 @@ const SOURCES = [
   { value: "server", label: "Server" },
   { value: "mongo", label: "Mongo" },
   { value: "caddy", label: "Caddy" },
-  { value: "judge0-server", label: "Judge0 Server" },
-  { value: "judge0-workers", label: "Judge0 Workers" },
-  { value: "judge0-db", label: "Judge0 Database" },
-  { value: "judge0-redis", label: "Judge0 Redis" },
+  { value: "citron", label: "Citron" },
 ];
 
 export default function LogsPage() {

@@ -18,7 +18,7 @@ export const api = {
       .catch((err) => { window.dispatchEvent(new CustomEvent("action-error", { detail: err.message })); throw err; })
       .finally(() => window.dispatchEvent(new Event("command-started")));
   },
-  restart: (target?: "all" | "caddy" | "caddy-restart" | "judge") => {
+  restart: (target?: "all" | "caddy" | "caddy-restart" | "citron") => {
     window.dispatchEvent(new Event("action-started"));
     return request("/restart", { method: "POST", body: JSON.stringify({ target }) })
       .catch((err) => { window.dispatchEvent(new CustomEvent("action-error", { detail: err.message })); throw err; })

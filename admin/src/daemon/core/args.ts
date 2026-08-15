@@ -4,7 +4,7 @@ export type DaemonArgs = {
   host?: string;
   port?: number;
   appCompose?: string;
-  judgeCompose?: string;
+  citronCompose?: string;
 };
 
 export function parseArgs(argv: string[]): DaemonArgs {
@@ -39,8 +39,8 @@ export function parseArgs(argv: string[]): DaemonArgs {
       i += 1;
       continue;
     }
-    if (arg === "--judge-compose") {
-      out.judgeCompose = argv[i + 1];
+    if (arg === "--citron-compose") {
+      out.citronCompose = argv[i + 1];
       i += 1;
       continue;
     }

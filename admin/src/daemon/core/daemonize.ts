@@ -11,7 +11,7 @@ export function spawnDaemon(args: DaemonArgs, moduleUrl: string) {
   if (args.host) cmd.push("--host", args.host);
   if (args.port) cmd.push("--port", String(args.port));
   if (args.appCompose) cmd.push("--app-compose", args.appCompose);
-  if (args.judgeCompose) cmd.push("--judge-compose", args.judgeCompose);
+  if (args.citronCompose) cmd.push("--citron-compose", args.citronCompose);
 
   Bun.spawn({
     cmd,

@@ -27,7 +27,7 @@ export function printUsage() {
     `  ${colors.cyan}status${colors.reset}     Check service and system status`,
   );
   console.log(
-    `  ${colors.cyan}logs${colors.reset}       View logs (daemon, app, judge0-server, judge0-workers)`,
+    `  ${colors.cyan}logs${colors.reset}       View logs (daemon, app, citron)`,
   );
   console.log(
     `  ${colors.cyan}ui${colors.reset}         Open the admin panel in browser`,

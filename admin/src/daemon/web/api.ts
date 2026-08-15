@@ -19,11 +19,13 @@ function determineRestartAction(
   paths: Paths,
   body: any,
   currentConfig: ReturnType<typeof getConfigSnapshot>,
-): "none" | "restart-all" | "reload-caddy" | "restart-caddy" | "restart-judge" | "restart-daemon" {
+): "none" | "restart-all" | "reload-caddy" | "restart-caddy" | "restart-citron" | "restart-daemon" {
   const appEnvChanged = typeof body.appEnv === "string" && body.appEnv !== currentConfig.appEnv;
   const configYamlChanged = typeof body.configYaml === "string" && body.configYaml !== currentConfig.configYaml;
   const caddyfileChanged = typeof body.caddyfile === "string" && body.caddyfile !== currentConfig.caddyfile;
-  const judge0Changed = typeof body.judge0 === "string" && body.judge0 !== currentConfig.judge0;
+  const citronChanged =
+    (typeof body.citron === "string" && body.citron !== currentConfig.citron) ||
+    (typeof body.citronLanguages === "string" && body.citronLanguages !== currentConfig.citronLanguages);
 
   if (configYamlChanged) {
     const oldCfg = parseConfigYaml(paths) || {};
@@ -54,14 +56,14 @@ function determineRestartAction(
     return "restart-all";
   }
 
-  if (caddyfileChanged && judge0Changed) {
+  if (caddyfileChanged && citronChanged) {
     return "restart-all";
   }
   if (caddyfileChanged) {
     return "reload-caddy";
   }
-  if (judge0Changed) {
-    return "restart-judge";
+  if (citronChanged) {
+    return "restart-citron";
   }
 
   return "none";
@@ -170,7 +172,7 @@ export function createApiHandler(paths: Paths) {
 
       if (method === "POST" && url.pathname === "/api/restart") {
         const body = await readJson(req);
-        const target = body?.target; // "all" | "caddy" | "caddy-restart" | "judge"
+        const target = body?.target; // "all" | "caddy" | "caddy-restart" | "citron"
         const compose = ComposeCommand.from(paths);
 
         if (target === "caddy") {
@@ -181,9 +183,9 @@ export function createApiHandler(paths: Paths) {
           await startCompose(paths, "restart", [
             { descriptor: compose.restartCaddy() },
           ]);
-        } else if (target === "judge") {
+        } else if (target === "citron") {
           await startCompose(paths, "restart", [
-            { descriptor: compose.restartServices("judge0-server", "judge0-workers") },
+            { descriptor: compose.restartServices("citron") },
           ]);
         } else {
           // "all" or unspecified — down then up with caddy reload
