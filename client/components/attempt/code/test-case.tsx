@@ -12,7 +12,54 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { CodingProblem } from "@/types/problem";
 
-import { runCode, submitCode } from "@/actions/contest";
+function toBase64(str: string) {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
+}
+
+async function runTestStream(
+  action: "run" | "submit",
+  contestId: string,
+  questionId: string,
+  code: string,
+  language: string,
+  onProgress: (completed: number, total: number) => void
+) {
+  const res = await fetch(`/api/test/${contestId}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contestId,
+      questionId,
+      code: toBase64(code),
+      language,
+      isBase64: true,
+    }),
+  });
+
+  if (!res.body) throw new Error("No response stream");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalData: any = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const msg = JSON.parse(line);
+      if (msg.type === "progress") onProgress(msg.completed, msg.total);
+      else if (msg.type === "error") throw new Error(msg.error);
+      else if (msg.type === "done") finalData = msg;
+    }
+  }
+
+  return finalData ?? { success: false, error: "Empty response" };
+}
 
 interface TestCaseResult {
   testCase: number;
@@ -38,16 +85,20 @@ export default function TestCasePanel({
   const { data: session } = useSession();
   const [view, setView] = useState<"initial" | "sample" | "hidden">("initial");
   const [isRunning, setIsRunning] = useState(false);
+  const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
   const [results, setResults] = useState<TestCaseResult[]>([]);
   const [activeTestCase, setActiveTestCase] = useState(0);
 
   const handleRun = async () => {
     if (!testid) return toast.error("Test ID missing");
     setIsRunning(true);
+    setProgress(null);
     setResults([]);
     setView("sample");
     try {
-      const data = await runCode(testid as string, String(problem.id), code, language);
+      const data = await runTestStream("run", testid as string, String(problem.id), code, language, (completed, total) =>
+        setProgress({ completed, total })
+      );
       if (data.success) {
         setResults(data.results);
       } else if (data.rateLimited) {
@@ -65,10 +116,13 @@ export default function TestCasePanel({
   const handleSubmit = async () => {
     if (!testid) return toast.error("Test ID missing");
     setIsRunning(true);
+    setProgress(null);
     setResults([]);
     setView("hidden");
     try {
-      const data = await submitCode(testid as string, String(problem.id), code, language);
+      const data = await runTestStream("submit", testid as string, String(problem.id), code, language, (completed, total) =>
+        setProgress({ completed, total })
+      );
       if (data.success) {
         setResults(data.results);
       } else if (data.rateLimited) {
@@ -116,9 +170,13 @@ export default function TestCasePanel({
       {/* Content Area */}
       <ScrollArea className="flex-1 p-4 pr-4 overflow-y-auto">
         {isRunning && (
-          <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground h-full gap-3 py-10">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-            <p>Executing code, please wait...</p>
+          <div className="flex flex-col items-center justify-center text-center h-full gap-3 py-10">
+            <div className="text-2xl font-bold text-primary tabular-nums">
+              {progress ? `${progress.completed}/${progress.total}` : "..."}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {progress ? "Running test cases..." : "Starting execution..."}
+            </p>
           </div>
         )}
 

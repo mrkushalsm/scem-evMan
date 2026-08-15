@@ -26,7 +26,7 @@ const removeTrailingLineCommands = (output) => {
 };
 
 // Common logic for executing code against test cases
-const executeTestCases = async ({ question, code, language, testCases, judge0Id, forceVisible = false }) => {
+const executeTestCases = async ({ question, code, language, testCases, judge0Id, forceVisible = false, onProgress }) => {
     const judge0Url = process.env.JUDGE0_URL || 'http://localhost:2358';
 
     // Wrap code
@@ -109,6 +109,8 @@ const executeTestCases = async ({ question, code, language, testCases, judge0Id,
                 isVisible: tc.isVisible
             });
         }
+
+        onProgress?.(index + 1, testCases.length);
     }
 
     return results;
@@ -159,22 +161,37 @@ const runCode = async (req, res, next) => {
             return res.status(400).json({ success: false, error: "No test cases configured" });
         }
 
+        res.writeHead(200, {
+            "Content-Type": "application/x-ndjson",
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        });
+
         const results = await executeTestCases({
             question,
             code,
             language,
             testCases: testToRun,
             judge0Id,
-            forceVisible: true
+            forceVisible: true,
+            onProgress: (completed, total) => {
+                res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
+            }
         });
 
-        return res.status(200).json({
+        res.write(JSON.stringify({
+            type: "done",
             success: true,
             results,
             passedCount: results.filter(r => r.passed).length,
             totalCount: results.length
-        });
+        }) + "\n");
+        res.end();
     } catch (error) {
+        if (res.headersSent) {
+            res.write(JSON.stringify({ type: "error", error: error.message }) + "\n");
+            return res.end();
+        }
         next(error);
     }
 };
@@ -217,6 +234,12 @@ const submitCode = async (req, res, next) => {
         const judge0Id = languageMap[language.toLowerCase()];
         if (!judge0Id) return res.status(400).json({ error: "Unsupported language" });
 
+        res.writeHead(200, {
+            "Content-Type": "application/x-ndjson",
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        });
+
         // Submit runs against ALL test cases for scoring
         const allTestCases = Array.isArray(question.testcases) ? question.testcases : [];
         const results = await executeTestCases({
@@ -224,7 +247,10 @@ const submitCode = async (req, res, next) => {
             code,
             language,
             testCases: allTestCases,
-            judge0Id
+            judge0Id,
+            onProgress: (completed, total) => {
+                res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
+            }
         });
 
         const passedCount = results.filter(r => r.passed).length;
@@ -287,13 +313,19 @@ const submitCode = async (req, res, next) => {
             isVisible: r.isVisible
         }));
 
-        return res.status(200).json({
+        res.write(JSON.stringify({
+            type: "done",
             success: true,
             results: clientResults, // Frontend receives only status and pass/fail info
             score,
             overallStatus
-        });
+        }) + "\n");
+        res.end();
     } catch (error) {
+        if (res.headersSent) {
+            res.write(JSON.stringify({ type: "error", error: error.message }) + "\n");
+            return res.end();
+        }
         next(error);
     }
 };

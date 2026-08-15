@@ -7,6 +7,7 @@ x-logging: &default-logging
 services:
   judge0-server:
     image: officialsosc/judge0:latest
+    command: ["./scripts/server"]
     profiles: ["internal-judge0"]
     volumes:
       - /opt/pomelo/config/judge0.conf:/judge0.conf:ro
