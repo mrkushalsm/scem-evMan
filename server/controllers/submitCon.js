@@ -492,4 +492,6 @@ const saveMCQ = async (req, res, next) => {
     }
 };
 
-module.exports = { saveMCQ, submitCode, runCode };
+// executeTestCases is exported so the execution path can be exercised directly
+// against a running engine, without standing up Express, Mongo and auth.
+module.exports = { saveMCQ, submitCode, runCode, executeTestCases };
