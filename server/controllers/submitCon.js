@@ -211,7 +211,7 @@ const saveSubmissionEntry = async (contestId, userId, questionId, entry) => {
     const updateExisting = () => Submission.findOneAndUpdate(
         { contest: contestId, user: userId, "submissions.question": questionId },
         { $set: { "submissions.$": entry } },
-        { new: true, runValidators: true }
+        { returnDocument: "after", runValidators: true }
     );
 
     let doc = await updateExisting();
@@ -221,7 +221,7 @@ const saveSubmissionEntry = async (contestId, userId, questionId, entry) => {
             doc = await Submission.findOneAndUpdate(
                 { contest: contestId, user: userId },
                 { $push: { submissions: entry } },
-                { new: true, upsert: true, runValidators: true }
+                { returnDocument: "after", upsert: true, runValidators: true }
             );
         } catch (err) {
             if (err.code !== 11000) throw err;
@@ -229,7 +229,7 @@ const saveSubmissionEntry = async (contestId, userId, questionId, entry) => {
             doc = await updateExisting() || await Submission.findOneAndUpdate(
                 { contest: contestId, user: userId },
                 { $push: { submissions: entry } },
-                { new: true, runValidators: true }
+                { returnDocument: "after", runValidators: true }
             );
         }
     }
@@ -392,7 +392,7 @@ const submitCode = async (req, res, next) => {
 
         const passedCount = results.filter(r => r.passed).length;
         const totalCount = allTestCases.length;
-        const score = totalCount > 0 ? (passedCount / totalCount) * (question.marks || 0) : 0;
+        const score = totalCount > 0 ? Math.floor((passedCount / totalCount) * (question.marks || 0)) : 0;
 
         // The worst test case decides the submission's overall status.
         let overallStatus = "Accepted";
@@ -495,7 +495,7 @@ const saveMCQ = async (req, res, next) => {
         const entry = {
             question: questionId,
             answer: Array.isArray(answer) ? answer : [answer],
-            score,
+            score: Math.floor(score),
             submittedAt: new Date()
         };
 

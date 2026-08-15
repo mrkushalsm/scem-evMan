@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CodeXml, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import { CodeXml, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -22,7 +22,7 @@ async function runTestStream(
   questionId: string,
   code: string,
   language: string,
-  onProgress: (completed: number, total: number) => void
+  onExecuting: () => void
 ) {
   const res = await fetch(`/api/test/${contestId}/${action}`, {
     method: "POST",
@@ -35,6 +35,19 @@ async function runTestStream(
       isBase64: true,
     }),
   });
+
+  // Errors (rate limits, validation, auth) come back as a plain JSON body, not as an
+  // ndjson frame — parse them here or they fall through as an empty stream.
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    return {
+      success: false,
+      rateLimited: res.status === 429,
+      error: body?.error || (res.status === 429
+        ? "Too many attempts.. wait a minute"
+        : `Request failed (${res.status})`),
+    };
+  }
 
   if (!res.body) throw new Error("No response stream");
 
@@ -52,13 +65,15 @@ async function runTestStream(
     for (const line of lines) {
       if (!line.trim()) continue;
       const msg = JSON.parse(line);
-      if (msg.type === "progress") onProgress(msg.completed, msg.total);
+      // The server writes its first progress frame once it hands the code to the
+      // engine, so it marks the move out of the queue.
+      if (msg.type === "progress") onExecuting();
       else if (msg.type === "error") throw new Error(msg.error);
       else if (msg.type === "done") finalData = msg;
     }
   }
 
-  return finalData ?? { success: false, error: "Empty response" };
+  return finalData ?? { success: false, error: "Execution ended without a result" };
 }
 
 interface TestCaseResult {
@@ -85,55 +100,53 @@ export default function TestCasePanel({
   const { data: session } = useSession();
   const [view, setView] = useState<"initial" | "sample" | "hidden">("initial");
   const [isRunning, setIsRunning] = useState(false);
-  const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [phase, setPhase] = useState<"queued" | "executing" | null>(null);
   const [results, setResults] = useState<TestCaseResult[]>([]);
   const [activeTestCase, setActiveTestCase] = useState(0);
 
   const handleRun = async () => {
     if (!testid) return toast.error("Test ID missing");
     setIsRunning(true);
-    setProgress(null);
+    setPhase("queued");
     setResults([]);
     setView("sample");
     try {
-      const data = await runTestStream("run", testid as string, String(problem.id), code, language, (completed, total) =>
-        setProgress({ completed, total })
+      const data = await runTestStream("run", testid as string, String(problem.id), code, language, () =>
+        setPhase("executing")
       );
       if (data.success) {
         setResults(data.results);
-      } else if (data.rateLimited) {
-        toast.error(data.error || "Rate limited — please wait before running again");
       } else {
         toast.error(data.error || data.message || "Failed to run code");
       }
-    } catch {
-      toast.error("Network error");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Network error");
     } finally {
       setIsRunning(false);
+      setPhase(null);
     }
   };
 
   const handleSubmit = async () => {
     if (!testid) return toast.error("Test ID missing");
     setIsRunning(true);
-    setProgress(null);
+    setPhase("queued");
     setResults([]);
     setView("hidden");
     try {
-      const data = await runTestStream("submit", testid as string, String(problem.id), code, language, (completed, total) =>
-        setProgress({ completed, total })
+      const data = await runTestStream("submit", testid as string, String(problem.id), code, language, () =>
+        setPhase("executing")
       );
       if (data.success) {
         setResults(data.results);
-      } else if (data.rateLimited) {
-        toast.error(data.error || "Rate limited — please wait before submitting again");
       } else {
         toast.error(data.error || data.message || "Failed to submit code");
       }
-    } catch {
-      toast.error("Network error");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Network error");
     } finally {
       setIsRunning(false);
+      setPhase(null);
     }
   };
 
@@ -171,11 +184,9 @@ export default function TestCasePanel({
       <ScrollArea className="flex-1 p-4 pr-4 overflow-y-auto">
         {isRunning && (
           <div className="flex flex-col items-center justify-center text-center h-full gap-3 py-10">
-            <div className="text-2xl font-bold text-primary tabular-nums">
-              {progress ? `${progress.completed}/${progress.total}` : "..."}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {progress ? "Running test cases..." : "Starting execution..."}
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {phase === "executing" ? "Executing" : "Queued"}
             </p>
           </div>
         )}

@@ -227,7 +227,7 @@ const updateProblem = async (req, res, next) => {
         if (testcases !== undefined) updates.testcases = safeTestcases;
         if (inputVariables !== undefined) updates.inputVariables = safeInputVariables;
 
-        const question = await Question.findByIdAndUpdate(id, updates, { new: true });
+        const question = await Question.findByIdAndUpdate(id, updates, { returnDocument: "after" });
 
         if (!question) return res.status(404).json({ success: false, error: 'Question not found' });
 
@@ -528,7 +528,7 @@ const updateContest = async (req, res, next) => {
             updates.questions = problemIds;
         }
 
-        const contest = await Contest.findByIdAndUpdate(id, updates, { new: true });
+        const contest = await Contest.findByIdAndUpdate(id, updates, { returnDocument: "after" });
         if (!contest) return res.status(404).json({ success: false, error: 'Contest not found' });
 
         res.status(200).json({ success: true });
