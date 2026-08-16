@@ -1,8 +1,3 @@
-# Citron for local development.
-#
-# Differs from production in two ways: the port is published so the server can be run
-# outside Docker, and config is mounted from the repo rather than /opt/pomelo.
-
 x-logging: &default-logging
   logging:
     driver: json-file
@@ -12,27 +7,18 @@ x-logging: &default-logging
 services:
   citron:
     image: justmodo/citron:latest
-    # No -address flag: the shipped citron.conf binds 0.0.0.0 so the admin-editable
-    # config stays the single source of truth for the listen address.
     command: ["citron", "-config", "/opt/citron/configs/citron.conf"]
     ports:
       - "127.0.0.1:2358:2358"
-
     cap_add: [SYS_ADMIN]
     security_opt:
       - apparmor=unconfined
       - systempaths=unconfined
     cgroup: private
-
-    # `exec` is required: Docker mounts tmpfs noexec by default, which would stop a
-    # compiled submission from running its own binary. Interpreted languages would
-    # still work, so this fails in a way that looks language-specific.
     tmpfs:
       - /box:size=2g,mode=1777,exec
-
     volumes:
       - ./config/citron/citron.conf:/opt/citron/configs/citron.conf:ro
       - ./config/citron/languages.toml:/opt/citron/configs/languages.toml:ro
-
     <<: *default-logging
     restart: unless-stopped

@@ -1,9 +1,3 @@
-# Citron: the sandboxed code execution engine.
-#
-# One container serves the API and executes submissions. It needs a few specific
-# grants so its sandbox can build namespaces — none of them is `privileged: true`,
-# and the Docker socket is never mounted.
-
 x-logging: &default-logging
   logging:
     driver: json-file
@@ -14,34 +8,16 @@ services:
   citron:
     image: justmodo/citron:latest
     profiles: ["internal-citron"]
-    # No -address flag: the shipped citron.conf binds 0.0.0.0 so the admin-editable
-    # config stays the single source of truth for the listen address.
     command: ["citron", "-config", "/opt/citron/configs/citron.conf"]
-
-    # Namespace creation. This is the only capability required.
     cap_add: [SYS_ADMIN]
     security_opt:
-      # The default AppArmor profile denies mount(), which the sandbox needs.
       - apparmor=unconfined
-      # Docker masks /proc/kcore and friends, which makes mounting a fresh procfs
-      # inside the sandbox fail. Unmasking applies to this container, which is
-      # trusted; submitted code still gets its own procfs in its own PID namespace.
       - systempaths=unconfined
     cgroup: private
-
-    # Workspaces and the compile cache are disposable and live in RAM. The size cap
-    # is what stops a submission writing files until the host disk fills.
-    # `exec` is required: Docker mounts tmpfs noexec by default, which would stop a
-    # compiled submission from running its own binary. Interpreted languages would
-    # still work, so this fails in a way that looks language-specific.
     tmpfs:
       - /box:size=2g,mode=1777,exec
-
     volumes:
       - /opt/pomelo/config/citron.conf:/opt/citron/configs/citron.conf:ro
       - /opt/pomelo/config/languages.toml:/opt/citron/configs/languages.toml:ro
-
-    # No published port: the app reaches it as http://citron:2358 on the compose
-    # network. Never expose this to a public interface — it runs untrusted code.
     <<: *default-logging
     restart: always
