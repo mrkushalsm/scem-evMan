@@ -9,7 +9,7 @@ import { saveQuestion } from "@/actions/save-question";
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Save, ArrowLeft } from "lucide-react";
+import { Save, ArrowLeft, Eye } from "lucide-react";
 import Link from "next/link";
 import BasicInfoCard from "./shared/info-card";
 import MCQCard from "./mcq/mcq-card";
@@ -166,6 +166,32 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isCreating ? (
+            <Button
+              variant="outline"
+              type="button"
+              disabled
+              title="Save the question first to preview it"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+          ) : (
+            <Link href={`/admin/questions/${type}/${initialData?.id}/preview`}>
+              <Button
+                variant="outline"
+                type="button"
+                title={
+                  form.formState.isDirty
+                    ? "Opens the last saved version, not your unsaved edits"
+                    : "Open this question in the candidate test UI"
+                }
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </Button>
+            </Link>
+          )}
           <Button
             type="submit"
             form="question-form"

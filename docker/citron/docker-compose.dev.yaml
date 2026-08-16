@@ -7,7 +7,7 @@ x-logging: &default-logging
 services:
   citron:
     image: justmodo/citron:latest
-    command: ["citron", "-config", "/opt/citron/configs/citron.conf"]
+    command: ["citron", "-config", "/opt/citron/configs/citron.conf", "-address", "0.0.0.0:2358"]
     ports:
       - "127.0.0.1:2358:2358"
     cap_add: [SYS_ADMIN]

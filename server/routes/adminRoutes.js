@@ -20,6 +20,12 @@ const {
   getAdminSubmissionDetail,
 } = require("../controllers/adminCon");
 const { getData, getOne } = require("../controllers/dataCon");
+const {
+  getQuestionPreview,
+  runPreview,
+  submitPreview,
+} = require("../controllers/previewCon");
+const { submissionLimiter } = require("../middlewares/rateLimiter");
 
 const router = express.Router();
 
@@ -41,6 +47,9 @@ const upload = multer({
 router.post("/questions/create", requireAuth(), isAdmin, createProblem);
 router.post("/questions/import/:type", requireAuth(), isAdmin, upload.single('file'), importQuestions);
 router.get("/questions/:id/export", requireAuth(), isAdmin, exportQuestion);
+router.get("/questions/:id/preview", requireAuth(), isAdmin, getQuestionPreview);
+router.post("/questions/:id/preview/run", requireAuth(), isAdmin, submissionLimiter, runPreview);
+router.post("/questions/:id/preview/submit", requireAuth(), isAdmin, submissionLimiter, submitPreview);
 router.put("/questions/:id/edit", requireAuth(), isAdmin, updateProblem);
 router.get("/questions/:id", requireAuth(), isAdmin, getProblemDetail);
 router.delete("/questions/:id", requireAuth(), isAdmin, deleteQuestion);

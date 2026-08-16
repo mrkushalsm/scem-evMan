@@ -10,7 +10,13 @@ import DescriptionPanel from "./description";
 import TestCasePanel from "./test-case";
 import { CodingProblem } from "@/types/problem";
 
-export function CodeScreen({ problem }: { problem: CodingProblem }) {
+export function CodeScreen({
+  problem,
+  draftKeyPrefix = "pomelo_draft",
+}: {
+  problem: CodingProblem;
+  draftKeyPrefix?: string;
+}) {
   const availableLanguages = Object.keys(problem.boilerplateCode || {}) as Array<keyof typeof problem.boilerplateCode>;
   
   const initialLanguage = problem.savedLanguage || (availableLanguages.length > 0 ? String(availableLanguages[0]) : "javascript");
@@ -24,19 +30,19 @@ export function CodeScreen({ problem }: { problem: CodingProblem }) {
     // If we do not have a saved code from the server for the current initial language, check local storage
     if (!problem.savedCode) {
       try {
-        const draft = localStorage.getItem(`pomelo_draft_${problem.id}_${initialLanguage}`);
+        const draft = localStorage.getItem(`${draftKeyPrefix}_${problem.id}_${initialLanguage}`);
         if (draft) setCode(draft);
       } catch { /* localStorage unavailable (e.g. private browsing) */ }
     }
-  }, [problem.id, initialLanguage, problem.savedCode]);
+  }, [problem.id, initialLanguage, problem.savedCode, draftKeyPrefix]);
 
   React.useEffect(() => {
     if (isMounted && code !== "") {
       try {
-        localStorage.setItem(`pomelo_draft_${problem.id}_${language}`, code);
+        localStorage.setItem(`${draftKeyPrefix}_${problem.id}_${language}`, code);
       } catch { /* localStorage unavailable */ }
     }
-  }, [code, language, problem.id, isMounted]);
+  }, [code, language, problem.id, isMounted, draftKeyPrefix]);
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
@@ -49,7 +55,7 @@ export function CodeScreen({ problem }: { problem: CodingProblem }) {
 
     // Try loading from local storage
     let draft: string | null = null;
-    try { draft = localStorage.getItem(`pomelo_draft_${problem.id}_${newLang}`); } catch { /* unavailable */ }
+    try { draft = localStorage.getItem(`${draftKeyPrefix}_${problem.id}_${newLang}`); } catch { /* unavailable */ }
     if (draft) {
       setCode(draft);
     } else {

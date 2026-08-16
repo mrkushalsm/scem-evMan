@@ -100,14 +100,14 @@ const postSubmission = async (payload) => {
 };
 
 // Runs every test case of one submission in a single citron request.
-const executeTestCases = async ({ question, code, language, testCases, languageId, forceVisible = false, onProgress }) => {
+const executeTestCases = async ({ question, code, language, testCases, languageId, onProgress }) => {
     // One entry per test case even on early failure, so scoring/client counts stay in sync.
     const failAllRaw = (status, error) => testCases.map((tc, index) => ({
         testCase: index + 1,
         passed: false,
         status,
         error,
-        isVisible: forceVisible || tc.isVisible,
+        isVisible: tc.isVisible === true,
     }));
 
     let prepared;
@@ -115,7 +115,7 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
         prepared = testCases.map((tc) => ({
             stdin: buildStdin(question, tc),
             expectedOutput: removeTrailingLineCommands(String(tc.output ?? "").trim()),
-            isVisible: forceVisible || tc.isVisible,
+            isVisible: tc.isVisible === true,
         }));
     } catch (err) {
         return failAllRaw("System Error", `This question's test data is misconfigured: ${err.message}`);
@@ -206,6 +206,86 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
     return results;
 };
 
+// How much of a test case result may cross the wire. FULL exposes hidden test
+// data and is only ever legal on an admin-authenticated route.
+const DISCLOSURE = Object.freeze({
+    SUMMARY: "summary",
+    VISIBLE: "visible",
+    FULL: "full",
+});
+
+const summarize = (result) => ({
+    testCase: result.testCase,
+    passed: result.passed,
+    status: result.status,
+    isVisible: result.isVisible,
+});
+
+const projectResults = (results, disclosure) => {
+    if (disclosure === DISCLOSURE.FULL) return results;
+    if (disclosure === DISCLOSURE.VISIBLE) {
+        return results.map(r => (r.isVisible === true ? r : summarize(r)));
+    }
+    return results.map(summarize);
+};
+
+const streamExecution = async (res, { question, code, language, languageId, testCases, disclosure, buildDone }) => {
+    if (!Object.values(DISCLOSURE).includes(disclosure)) {
+        throw new Error(
+            `streamExecution requires an explicit disclosure level (${Object.values(DISCLOSURE).join(", ")}), got ${JSON.stringify(disclosure)}`
+        );
+    }
+
+    res.writeHead(200, {
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no"
+    });
+    // Keeps proxies from treating the connection as idle while the batch runs.
+    res.write(JSON.stringify({ type: "progress", completed: 0, total: testCases.length }) + "\n");
+
+    const results = await executeTestCases({
+        question,
+        code,
+        language,
+        testCases,
+        languageId,
+        onProgress: (completed, total) => {
+            res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
+        }
+    });
+
+    const done = await buildDone(results);
+
+    // Single chokepoint: nothing reaches the client without passing the projection.
+    const wire = Array.isArray(done.results)
+        ? { ...done, results: projectResults(done.results, disclosure) }
+        : done;
+
+    res.write(JSON.stringify({ type: "done", success: true, ...wire }) + "\n");
+    res.end();
+};
+
+const scoreResults = (question, results) => {
+    const passedCount = results.filter(r => r.passed).length;
+    const totalCount = results.length;
+    const score = totalCount > 0 ? Math.floor((passedCount / totalCount) * (question.marks || 0)) : 0;
+
+    // The worst test case decides the submission's overall status.
+    let overallStatus = "Accepted";
+    if (passedCount < totalCount) {
+        const ranking = ["Compilation Error", "System Error", "Time Limit Exceeded", "Runtime Error", "Wrong Answer"];
+        const seen = results.map(r => normalizeSubmissionStatus(r.status));
+        overallStatus = ranking.find(status => seen.includes(status)) || "Wrong Answer";
+    }
+
+    // Slowest and heaviest test case: what the submission actually cost to run.
+    const executionTime = results.reduce((max, r) => Math.max(max, r.executionTime || 0), 0);
+    const memoryUsed = results.reduce((max, r) => Math.max(max, r.memoryUsed || 0), 0);
+
+    return { passedCount, totalCount, score, overallStatus, executionTime, memoryUsed };
+};
+
 // Persists one question's entry atomically, avoiding a read-then-write race between concurrent submissions.
 const saveSubmissionEntry = async (contestId, userId, questionId, entry) => {
     const updateExisting = () => Submission.findOneAndUpdate(
@@ -288,34 +368,19 @@ const runCode = async (req, res, next) => {
             return res.status(400).json({ success: false, error: "No test cases configured" });
         }
 
-        res.writeHead(200, {
-            "Content-Type": "application/x-ndjson",
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
-        });
-        // Keeps proxies from treating the connection as idle while the batch runs.
-        res.write(JSON.stringify({ type: "progress", completed: 0, total: testToRun.length }) + "\n");
-
-        const results = await executeTestCases({
+        await streamExecution(res, {
             question,
             code,
             language,
-            testCases: testToRun,
             languageId,
-            forceVisible: true,
-            onProgress: (completed, total) => {
-                res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
-            }
+            testCases: testToRun,
+            disclosure: DISCLOSURE.VISIBLE,
+            buildDone: (results) => ({
+                results,
+                passedCount: results.filter(r => r.passed).length,
+                totalCount: results.length
+            })
         });
-
-        res.write(JSON.stringify({
-            type: "done",
-            success: true,
-            results,
-            passedCount: results.filter(r => r.passed).length,
-            totalCount: results.length
-        }) + "\n");
-        res.end();
     } catch (error) {
         if (res.headersSent) {
             res.write(JSON.stringify({ type: "error", error: error.message }) + "\n");
@@ -371,70 +436,31 @@ const submitCode = async (req, res, next) => {
             return res.status(400).json({ error: "No test cases configured" });
         }
 
-        res.writeHead(200, {
-            "Content-Type": "application/x-ndjson",
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
-        });
-        // Keeps proxies from treating the connection as idle while the batch runs.
-        res.write(JSON.stringify({ type: "progress", completed: 0, total: allTestCases.length }) + "\n");
-
-        const results = await executeTestCases({
+        await streamExecution(res, {
             question,
             code,
             language,
-            testCases: allTestCases,
             languageId,
-            onProgress: (completed, total) => {
-                res.write(JSON.stringify({ type: "progress", completed, total }) + "\n");
+            testCases: allTestCases,
+            disclosure: DISCLOSURE.SUMMARY,
+            buildDone: async (results) => {
+                const { score, overallStatus, executionTime, memoryUsed } = scoreResults(question, results);
+
+                await saveSubmissionEntry(contestId, userId, questionId, {
+                    question: questionId,
+                    code,
+                    language,
+                    status: overallStatus,
+                    score,
+                    testCaseResults: results,
+                    executionTime,
+                    memoryUsed,
+                    submittedAt: new Date()
+                });
+
+                return { results, score, overallStatus };
             }
         });
-
-        const passedCount = results.filter(r => r.passed).length;
-        const totalCount = allTestCases.length;
-        const score = totalCount > 0 ? Math.floor((passedCount / totalCount) * (question.marks || 0)) : 0;
-
-        // The worst test case decides the submission's overall status.
-        let overallStatus = "Accepted";
-        if (passedCount < totalCount) {
-            const ranking = ["Compilation Error", "System Error", "Time Limit Exceeded", "Runtime Error", "Wrong Answer"];
-            const seen = results.map(r => normalizeSubmissionStatus(r.status));
-            overallStatus = ranking.find(status => seen.includes(status)) || "Wrong Answer";
-        }
-
-        // Slowest and heaviest test case: what the submission actually cost to run.
-        const executionTime = results.reduce((max, r) => Math.max(max, r.executionTime || 0), 0);
-        const memoryUsed = results.reduce((max, r) => Math.max(max, r.memoryUsed || 0), 0);
-
-        const entry = {
-            question: questionId,
-            code,
-            language,
-            status: overallStatus,
-            score,
-            testCaseResults: results,
-            executionTime,
-            memoryUsed,
-            submittedAt: new Date()
-        };
-
-        await saveSubmissionEntry(contestId, userId, questionId, entry);
-
-        const clientResults = results.map(r => ({
-            testCase: r.testCase,
-            passed: r.passed,
-            status: r.status,
-            isVisible: r.isVisible
-        }));
-
-        res.write(JSON.stringify({
-            type: "done",
-            success: true,
-            results: clientResults, // Frontend receives only status and pass/fail info
-            score,
-            overallStatus
-        }) + "\n");
-        res.end();
     } catch (error) {
         if (res.headersSent) {
             res.write(JSON.stringify({ type: "error", error: error.message }) + "\n");
@@ -525,4 +551,4 @@ const saveMCQ = async (req, res, next) => {
 };
 
 // executeTestCases is exported to exercise the execution path without Express/Mongo/auth.
-module.exports = { saveMCQ, submitCode, runCode, executeTestCases };
+module.exports = { saveMCQ, submitCode, runCode, executeTestCases, streamExecution, scoreResults, projectResults, DISCLOSURE, MAX_CODE_LENGTH };

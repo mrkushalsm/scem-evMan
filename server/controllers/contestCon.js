@@ -1,8 +1,7 @@
 const Contest = require('../models/Contest');
 const User = require('../models/User');
 const Question = require('../models/Question');
-const { getJudge } = require('@pomelo/code-gen');
-const { formatTestCaseInput } = require('../utils/formatTestCaseInput');
+const { toProblemView } = require('../utils/toProblemView');
 
 // @desc    Validate 6-digit Join ID (OTP)
 // @route   POST /api/contest/validate
@@ -138,7 +137,7 @@ const getContestData = async (req, res, next) => {
     try {
         const contest = req.contest;
 
-        const questions = await require('../models/Question').find({
+        const questions = await Question.find({
             _id: { $in: contest.questions }
         });
 
@@ -181,31 +180,7 @@ const getContestData = async (req, res, next) => {
                     if (qid && qid !== id) {
                         return { id: q._id, type: q.type };
                     }
-                    return {
-                        id: q._id,
-                        type: q.type, // Added type field
-                        title: q.title,
-                        difficulty: q.difficulty,
-                        description: q.description,
-                        inputFormat: q.inputFormat,
-                        outputFormat: q.outputFormat,
-                        constraints: q.constraints,
-                        boilerplateCode: q.boilerplateCode,
-                        questionType: q.questionType,
-                        options: q.options,
-                        marks: q.marks,
-                        savedAnswer: answerMap[id] ? answerMap[id].answer : undefined,
-                        savedCode: answerMap[id] ? answerMap[id].code : undefined,
-                        savedLanguage: answerMap[id] ? answerMap[id].language : undefined,
-                        examples: (q.testcases || [])
-                            .filter(tc => tc.isVisible)
-                            .slice(0, 3)
-                            .map(tc => ({
-                                input: formatTestCaseInput(tc.input, q.inputVariables),
-                                output: tc.output,
-                                explanation: tc.explanation || undefined,
-                            })),
-                    };
+                    return toProblemView(q, { saved: answerMap[id] });
                 })
             }
         });
@@ -266,37 +241,6 @@ const startTest = async (req, res, next) => {
         });
     } catch (error) {
         next(error);
-    }
-};
-
-// @desc    Get questions for a specific test
-const getTestQuestions = async (req, res, next) => {
-    try {
-        const { id: testId } = req.params;
-        const contest = await Contest.findById(testId);
-        if (!contest) return res.status(404).json({ success: false, error: 'Test not found' });
-
-        const questions = await Question.find({ _id: { $in: contest.questions } });
-        const questionsData = questions.map(q => ({
-            id: q._id,
-            type: q.type || (q.questionType === 'Coding' ? 'coding' : 'mcq'), // Normalize type
-            title: q.title,
-            description: q.description,
-            difficulty: q.difficulty,
-            marks: q.marks,
-            questionType: q.questionType,
-            constraints: q.constraints,
-            inputFormat: q.inputFormat,
-            outputFormat: q.outputFormat,
-            boilerplateCode: q.boilerplateCode,
-            functionName: q.functionName,
-            inputVariables: q.inputVariables,
-            options: q.options
-        }));
-
-        return res.json({ success: true, data: { questions: questionsData } });
-    } catch (error) {
-        return next(error);
     }
 };
 
@@ -412,7 +356,6 @@ module.exports = {
     checkTestId,
     getContestLanding,
     getContestData,
-    getTestQuestions,
     startTest,
     endTest,
     getLeaderboard

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
-import { submitMcq } from "@/actions/contest";
+import { useAttemptRuntime } from "./attempt-runtime";
 
 interface MCQScreenProps {
   problem: MCQProblem;
@@ -25,6 +25,7 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
   const [selected, setSelected] = useState<string[]>(problem.savedAnswer || []);
   const router = useRouter();
   const params = useParams();
+  const runtime = useAttemptRuntime();
   const [isSaving, setIsSaving] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the latest selection for debounced flush
@@ -35,15 +36,24 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
   const codingProblems = problems.filter((p) => p.type === "coding");
   const sortedProblems = [...mcqProblems, ...codingProblems];
 
+  const correctIndices = useMemo(() => {
+    if (runtime.mode !== "preview" || !problem.correctAnswer) return new Set<number>();
+    return new Set(
+      String(problem.correctAnswer)
+        .split(",")
+        .map((s) => parseInt(s.trim(), 10))
+        .filter((n) => !isNaN(n))
+    );
+  }, [runtime.mode, problem.correctAnswer]);
+
   const currentIndex = sortedProblems.findIndex((p) => String(p.id) === String(problem._id || problem.id));
   const prevProblem = sortedProblems[currentIndex - 1];
   const nextProblem = sortedProblems[currentIndex + 1];
 
   const doSave = useCallback(async (answers: string[]) => {
-    if (!params.testid) return;
     setIsSaving(true);
     try {
-      const data = await submitMcq(params.testid as string, String(problem._id || problem.id), answers);
+      const data = await runtime.saveMcqAnswer(String(problem._id || problem.id), answers);
       if (!data.success) {
         if (data.rateLimited) {
           toast.error(data.error || "Rate limited — please slow down");
@@ -57,7 +67,7 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
       setIsSaving(false);
       pendingSelectionRef.current = null;
     }
-  }, [params.testid, problem._id, problem.id]);
+  }, [runtime, problem._id, problem.id]);
 
   const flushPending = useCallback(() => {
     if (debounceTimerRef.current) {
@@ -193,6 +203,11 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
                             <span className="text-base font-medium flex-1 min-w-0 text-foreground">
                               {optValue}
                             </span>
+                            {correctIndices.has(index) && (
+                              <Badge variant="secondary" className="shrink-0">
+                                Correct
+                              </Badge>
+                            )}
                           </div>
                         </label>
                       </div>
@@ -229,6 +244,11 @@ export default function MCQScreen({ problem, problems }: MCQScreenProps) {
                             <span className="text-base font-medium flex-1 min-w-0 text-foreground">
                               {optValue}
                             </span>
+                            {correctIndices.has(index) && (
+                              <Badge variant="secondary" className="shrink-0">
+                                Correct
+                              </Badge>
+                            )}
                           </div>
                         </label>
                       </div>
