@@ -23,16 +23,15 @@ const { getData, getOne } = require("../controllers/dataCon");
 
 const router = express.Router();
 
-// Multer config for CSV/JSON upload (memory storage)
+// Multer config for JSON upload (memory storage)
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    const isCsv = file.mimetype === 'text/csv' || file.originalname.endsWith('.csv');
     const isJson = file.mimetype === 'application/json' || file.originalname.endsWith('.json');
-    if (isCsv || isJson) {
+    if (isJson) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV and JSON files are allowed'), false);
+      cb(new Error('Only JSON files are allowed'), false);
     }
   },
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit

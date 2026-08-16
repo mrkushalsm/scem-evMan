@@ -50,22 +50,37 @@ const codingQuestionSchema = baseQuestionSchema.extend({
 });
 
 // MCQ question schema
-const mcqQuestionSchema = baseQuestionSchema.extend({
-  type: z.literal("mcq"),
-  questionType: z
-    .enum(["Single Correct", "Multiple Correct"])
-    .optional()
-    .default("Single Correct"),
-  options: z
-    .array(z.string().min(1, "Option text cannot be empty"))
-    .min(2, "At least 2 options are required")
-    .max(10, "Maximum 10 options allowed"),
-  correctAnswer: z.union([
-    z.string().min(1, "At least one correct answer is required"),
-    z.array(z.string().min(1)).min(1, "At least one correct answer is required"),
-  ]),
-  multipleCorrect: z.boolean().optional(),
-});
+const mcqQuestionSchema = baseQuestionSchema
+  .extend({
+    type: z.literal("mcq"),
+    questionType: z
+      .enum(["Single Correct", "Multiple Correct"])
+      .optional()
+      .default("Single Correct"),
+    options: z
+      .array(z.string().min(1, "Option text cannot be empty"))
+      .min(2, "At least 2 options are required")
+      .max(10, "Maximum 10 options allowed"),
+    correctAnswer: z.union([
+      z.number().int("Correct answer must be an option index").min(0),
+      z
+        .array(z.number().int("Correct answer must be an option index").min(0))
+        .min(1, "At least one correct answer is required"),
+    ]),
+    multipleCorrect: z.boolean().optional(),
+  })
+  .superRefine((mcq, ctx) => {
+    const indices = Array.isArray(mcq.correctAnswer) ? mcq.correctAnswer : [mcq.correctAnswer];
+    indices.forEach((idx) => {
+      if (idx >= mcq.options.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["correctAnswer"],
+          message: `Correct answer index ${idx} is out of range for ${mcq.options.length} options`,
+        });
+      }
+    });
+  });
 
 // Combined question schema (discriminated union)
 const questionSchema = z.discriminatedUnion("type", [

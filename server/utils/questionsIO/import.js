@@ -189,32 +189,11 @@ function transformQuestionToMongo(question) {
   } else if (question.type === "mcq") {
     const mcq = question;
 
-    // Normalize correctAnswer to a comma-separated string of indices
-    let answerArray = [];
-    if (Array.isArray(mcq.correctAnswer)) {
-      answerArray = mcq.correctAnswer;
-    } else {
-      answerArray = [mcq.correctAnswer];
-    }
-
-    const correctIndices = answerArray.map((ans) => {
-      // Find the index of the answer text in the options array
-      const idx = mcq.options.indexOf(ans);
-      if (idx !== -1) {
-        return idx;
-      }
-      
-      // If not found as text, check if it's already a valid index number or string index
-      const num = parseInt(ans, 10);
-      if (!isNaN(num) && num >= 0 && num < mcq.options.length) {
-        return num;
-      }
-
-      throw new Error(`Correct answer "${ans}" does not match any option, and is not a valid index.`);
-    });
+    // correctAnswer is an option index (or array of indices)
+    const answerArray = Array.isArray(mcq.correctAnswer) ? mcq.correctAnswer : [mcq.correctAnswer];
 
     // Sort indices for consistency and remove duplicates
-    const uniqueIndices = [...new Set(correctIndices)].sort((a, b) => a - b);
+    const uniqueIndices = [...new Set(answerArray)].sort((a, b) => a - b);
     const correctAnswerValue = uniqueIndices.join(",");
     const multipleCorrect = uniqueIndices.length > 1;
 

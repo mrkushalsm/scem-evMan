@@ -8,7 +8,17 @@
       "difficulty": "Easy",
       "questionType": "Single Correct",
       "options": ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
-      "correctAnswer": "O(log n)"
+      "correctAnswer": 1
+    },
+    {
+      "type": "mcq",
+      "title": "Which of the following are sorting algorithms?",
+      "description": "Select all options that are sorting algorithms.",
+      "marks": 10,
+      "difficulty": "Easy",
+      "questionType": "Multiple Correct",
+      "options": ["Quicksort", "Binary Search", "Merge Sort", "Depth-First Search"],
+      "correctAnswer": [0, 2]
     },
     {
       "type": "coding",
@@ -28,8 +38,5 @@
         { "input": "4 9\n2 7 11 15", "output": "0 1", "isVisible": true, "explanation": "nums[0] + nums[1] = 2 + 7 = 9, so the answer is [0, 1]." }
       ]
     }
-  ],
-  "meta": {
-    "description": "Sample bulk import file: one MCQ and one coding question"
-  }
+  ]
 }

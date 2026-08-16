@@ -24,18 +24,14 @@ function exportSingleQuestion(mongoDoc) {
   } else if (questionData.type === "mcq") {
     const isMultiple = questionData.questionType === "Multiple Correct" || questionData.multipleCorrect;
     let correctAnswer = questionData.correctAnswer;
-    
+
     if (typeof questionData.correctAnswer === "string") {
       const indices = questionData.correctAnswer
         .split(",")
         .map(idx => parseInt(idx.trim(), 10))
         .filter(idx => !isNaN(idx));
-      
-      const texts = indices
-        .map(idx => questionData.options[idx])
-        .filter(Boolean);
-        
-      correctAnswer = isMultiple ? texts : (texts[0] || questionData.correctAnswer);
+
+      correctAnswer = isMultiple ? indices : indices[0];
     }
 
     return {

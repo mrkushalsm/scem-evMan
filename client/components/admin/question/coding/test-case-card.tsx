@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { useFormContext, useFieldArray } from "react-hook-form";
 import {
     Card,
@@ -26,7 +25,7 @@ import {
     SelectItem,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Beaker, Plus, Trash2, Code2, Download, Upload } from "lucide-react";
+import { Beaker, Plus, Trash2, Code2 } from "lucide-react";
 
 const SUPPORTED_TYPES = [
     "int",
@@ -40,7 +39,6 @@ const SUPPORTED_TYPES = [
 
 export default function TestCaseCard() {
     const { control, watch } = useFormContext();
-    const fileRef = useRef<HTMLInputElement>(null);
 
     const {
         fields: variableFields,
@@ -69,114 +67,6 @@ export default function TestCaseCard() {
     
     const isMissingNames = inputVariables.some((v: { variable: string }) => !v.variable?.trim());
     const isVariableInvalid = isMissingNames || hasDuplicateVariables;
-
-    const handleDownloadTemplate = () => {
-        if (!inputVariables || inputVariables.length === 0) return;
-        const headers = ["isVisible", "output", "explanation", ...inputVariables.map((v: {variable: string}) => v.variable)];
-        const exampleRow = ["FALSE", "Expected Output", "Optional explanation", ...inputVariables.map((v: {variable: string}) => `Value for ${v.variable}`)];
-        const csvContent = headers.join(",") + "\n" + exampleRow.join(",");
-        
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "testcases_template.csv";
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const handleUploadCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        try {
-            const text = await file.text();
-            const lines = text.trim().split('\n');
-            if (lines.length < 2) {
-                alert("CSV must have a header row and at least one data row");
-                return;
-            }
-
-            const parseCSVLine = (line: string): string[] => {
-                const result: string[] = [];
-                let current = '';
-                let inQuotes = false;
-
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                        if (inQuotes && line[i + 1] === '"') {
-                            current += '"';
-                            i++;
-                        } else {
-                            inQuotes = !inQuotes;
-                        }
-                    } else if (char === ',' && !inQuotes) {
-                        result.push(current);
-                        current = '';
-                    } else {
-                        current += char;
-                    }
-                }
-                result.push(current);
-                return result;
-            };
-
-            const expectedHeaders = ["isVisible", "output", ...inputVariables.map((v: {variable: string}) => v.variable)];
-            const headers = parseCSVLine(lines[0]).map(h => h.trim());
-
-            // Validate headers
-            const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
-            if (missingHeaders.length > 0) {
-                alert(`CSV is missing required columns: ${missingHeaders.join(', ')}`);
-                if (fileRef.current) fileRef.current.value = "";
-                return;
-            }
-
-            const newTestCases = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = parseCSVLine(lines[i]);
-                if (values.length === 1 && !values[0].trim()) continue; // skip empty lines
-                
-                if (values.length < headers.length) {
-                    alert(`Row ${i + 1} has missing columns. Expected ${headers.length}, got ${values.length}.`);
-                    if (fileRef.current) fileRef.current.value = "";
-                    return;
-                }
-                
-                const rowData: Record<string, string> = {};
-                headers.forEach((h, idx) => {
-                    rowData[h] = values[idx] || '';
-                });
-
-                const inputData: Record<string, string | string[]> = {};
-                inputVariables.forEach((v: {variable: string; type: string}) => {
-                    const raw = rowData[v.variable] || '';
-                    inputData[v.variable] = v.type.includes("_array")
-                        ? raw.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '')
-                        : raw;
-                });
-
-                newTestCases.push({
-                    isVisible: rowData['isVisible']?.toUpperCase() === 'TRUE',
-                    output: rowData['output'] || '',
-                    explanation: rowData['explanation'] || '',
-                    input: inputData
-                });
-            }
-
-            newTestCases.forEach(tc => appendTestCase(tc));
-            
-        } catch (error) {
-            console.error("Failed to parse CSV", error);
-            alert("Failed to parse CSV file");
-        }
-        
-        if (fileRef.current) {
-            fileRef.current.value = "";
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -320,35 +210,6 @@ export default function TestCaseCard() {
                                     </span>
                                 )}
                                 
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleDownloadTemplate}
-                                    disabled={isVariableInvalid}
-                                >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Template
-                                </Button>
-                                
-                                <input
-                                    type="file"
-                                    accept=".csv"
-                                    className="hidden"
-                                    ref={fileRef}
-                                    onChange={handleUploadCSV}
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => fileRef.current?.click()}
-                                    disabled={isVariableInvalid}
-                                >
-                                    <Upload className="h-4 w-4 mr-2" />
-                                    Import CSV
-                                </Button>
-
                                 <Button
                                     type="button"
                                     variant="outline"

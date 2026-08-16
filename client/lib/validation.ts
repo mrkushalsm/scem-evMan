@@ -138,12 +138,25 @@ export function validateImportJSONClient(jsonString: string): ClientValidationRe
         });
       }
 
-      if (!q.correctAnswer) {
+      if (q.correctAnswer === undefined || q.correctAnswer === null) {
         errors.push({
           index: idx,
           field: 'correctAnswer',
           message: 'MCQ question missing "correctAnswer"',
         });
+      } else {
+        const indices = Array.isArray(q.correctAnswer) ? q.correctAnswer : [q.correctAnswer];
+        const optionsLength = Array.isArray(q.options) ? q.options.length : 0;
+        const invalid = indices.some(
+          (i: unknown) => typeof i !== 'number' || !Number.isInteger(i) || i < 0 || i >= optionsLength
+        );
+        if (invalid) {
+          errors.push({
+            index: idx,
+            field: 'correctAnswer',
+            message: '"correctAnswer" must be the option index (or indices) as a number, within range',
+          });
+        }
       }
     }
   });

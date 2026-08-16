@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, AlertCircle, CheckCircle2, AlertTriangle, X, Download } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Upload, FileJson, AlertCircle, CheckCircle2, AlertTriangle, X, Download, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { importQuestions } from "@/actions/import-questions";
 import { validateImportJSONClient } from "@/lib/validation";
@@ -20,7 +20,7 @@ const EXAMPLE_JSON_PLACEHOLDER = `{
       "difficulty": "Easy",
       "questionType": "Single Correct",
       "options": ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
-      "correctAnswer": "O(log n)"
+      "correctAnswer": 1
     },
     {
       "type": "coding",
@@ -36,6 +36,16 @@ const EXAMPLE_JSON_PLACEHOLDER = `{
     }
   ]
 }`;
+
+function groupErrors(errors: ImportResult["errors"]) {
+  const groups = new Map<string, ImportResult["errors"]>();
+  errors.forEach((err) => {
+    const key = err.index !== undefined ? `Question ${err.index + 1}` : "General";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(err);
+  });
+  return Array.from(groups.entries());
+}
 
 interface ImportResult {
   valid: boolean;
@@ -122,11 +132,11 @@ export default function BulkImportDialog({
 
       setImportStatus({
         success: true,
-        message: `✓ Successfully imported ${result.imported} question(s)`,
+        message: `Successfully imported ${result.imported} question${result.imported !== 1 ? "s" : ""}`,
       });
 
       // Let the success message show briefly, then close and hand off to
-      // the caller — reset state after, once the dialog is unmounted anyway.
+      // the caller. Reset state after, once the dialog is unmounted anyway.
       setTimeout(() => {
         setJsonInput("");
         setValidationResult(null);
@@ -147,65 +157,179 @@ export default function BulkImportDialog({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Upload className="w-5 h-5" />
-              <h2 className="text-xl font-bold">Bulk Import Questions</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+  const resultsPanel = (
+    <>
+      {!validationResult && !importStatus && (
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+          <Inbox className="h-8 w-8" />
+          <p className="text-sm">Validate your JSON to see results here.</p>
+        </div>
+      )}
 
-          <div className="flex justify-end mb-4">
-            <a href="/templates/questions_import_example.json" download>
-              <Button variant="outline" size="sm" type="button" className="gap-2">
-                <Download className="w-4 h-4" />
-                Download Sample
-              </Button>
-            </a>
-          </div>
+      {validationResult && (
+        <div className="space-y-4">
+          {validationResult.valid ? (
+            <Alert className="border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-950/30">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-700 dark:text-green-400">
+                JSON is valid. Ready to import {validationResult.count} question
+                {validationResult.count !== 1 ? "s" : ""}.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Validation failed. {validationResult.errors.length} issue
+                {validationResult.errors.length !== 1 ? "s" : ""} found.
+              </AlertDescription>
+            </Alert>
+          )}
 
-          <Tabs defaultValue="paste" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="paste">Paste JSON</TabsTrigger>
-              <TabsTrigger value="upload">Upload File</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="paste" className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Paste your JSON here
-                </label>
-                <Textarea
-                  value={jsonInput}
-                  onChange={(e) => handleJsonInputChange(e.target.value)}
-                  placeholder={EXAMPLE_JSON_PLACEHOLDER}
-                  className="font-mono text-sm h-64"
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  Accepts bulk format: {"{ questions: [...] }"} or single question JSON. Not sure of the shape? Download the sample above.
-                </p>
+          {validationResult.preview && validationResult.preview.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                Questions found ({validationResult.preview.length})
+              </p>
+              <div className="divide-y overflow-hidden rounded-lg border bg-card">
+                {validationResult.preview.map((q, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                  >
+                    <span className="truncate">{q.title}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                      <span className="rounded-full bg-muted px-2 py-0.5 uppercase tracking-wide">
+                        {q.type}
+                      </span>
+                      {q.difficulty && <span>{q.difficulty}</span>}
+                      {q.marks !== undefined && <span>{q.marks} pts</span>}
+                    </span>
+                  </div>
+                ))}
               </div>
+            </div>
+          )}
 
-              <Button
-                onClick={handleValidate}
-                variant="outline"
-                className="w-full"
-              >
+          {validationResult.errors.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Errors</p>
+              <div className="divide-y overflow-hidden rounded-lg border bg-card">
+                {groupErrors(validationResult.errors).map(([group, errs]) => (
+                  <div key={group} className="px-3 py-2.5">
+                    <p className="mb-1.5 text-xs font-medium text-foreground">{group}</p>
+                    <ul className="space-y-1">
+                      {errs.map((err, idx) => (
+                        <li key={idx} className="flex items-baseline gap-2 text-xs text-destructive">
+                          {err.field && (
+                            <span className="shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-destructive">
+                              {err.field}
+                            </span>
+                          )}
+                          <span>{err.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {validationResult.warnings && validationResult.warnings.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900/50 dark:bg-yellow-950/30">
+              {validationResult.warnings.map((warn, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 text-xs text-yellow-700 dark:text-yellow-400"
+                >
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{warn}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {importStatus && (
+        <Alert
+          variant={importStatus.success ? "default" : "destructive"}
+          className={
+            importStatus.success
+              ? "mt-4 border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-950/30"
+              : "mt-4"
+          }
+        >
+          {importStatus.success ? (
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+          ) : (
+            <AlertCircle className="h-4 w-4" />
+          )}
+          <AlertDescription
+            className={importStatus.success ? "text-green-700 dark:text-green-400" : undefined}
+          >
+            {importStatus.message}
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex shrink-0 items-center justify-between border-b px-6 py-4 lg:px-10">
+        <div className="flex items-center gap-2.5">
+          <Upload className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-base font-semibold">Bulk Import Questions</h2>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[1fr_380px] lg:overflow-hidden">
+        {/* Editor pane */}
+        <div className="flex min-h-0 flex-1 flex-col px-6 py-6 lg:h-full lg:px-10 lg:py-8">
+          <Tabs defaultValue="paste" className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="flex shrink-0 items-center justify-between gap-4">
+              <TabsList>
+                <TabsTrigger value="paste">Paste JSON</TabsTrigger>
+                <TabsTrigger value="upload">Upload File</TabsTrigger>
+              </TabsList>
+
+              <a href="/templates/questions_template.json" download>
+                <Button variant="ghost" size="sm" type="button" className="gap-1.5 text-muted-foreground">
+                  <Download className="h-3.5 w-3.5" />
+                  Template
+                </Button>
+              </a>
+            </div>
+
+            <TabsContent value="paste" className="flex min-h-0 flex-1 flex-col gap-3 data-[state=inactive]:hidden">
+              <Textarea
+                value={jsonInput}
+                onChange={(e) => handleJsonInputChange(e.target.value)}
+                placeholder={EXAMPLE_JSON_PLACEHOLDER}
+                className="min-h-0 flex-1 resize-none overflow-y-auto font-mono text-xs [field-sizing:fixed]"
+              />
+              <p className="shrink-0 text-xs text-muted-foreground">
+                Accepts <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{ questions: [...] }"}</code> or a single question. Not sure of the shape? Download the template above.
+              </p>
+
+              <Button onClick={handleValidate} variant="outline" className="w-full shrink-0">
                 Validate JSON
               </Button>
             </TabsContent>
 
-            <TabsContent value="upload" className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+            <TabsContent value="upload" className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-16 text-center lg:py-0">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -213,14 +337,14 @@ export default function BulkImportDialog({
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm font-medium mb-2">
-                  Click to upload or drag and drop
-                </p>
-                <p className="text-xs text-muted-foreground mb-4">JSON files only</p>
+                <FileJson className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm font-medium">Click to upload or drag and drop</p>
+                <p className="text-xs text-muted-foreground">JSON files only</p>
                 <Button
                   onClick={() => fileInputRef.current?.click()}
                   variant="outline"
+                  size="sm"
+                  className="mt-2"
                 >
                   Select File
                 </Button>
@@ -228,129 +352,29 @@ export default function BulkImportDialog({
             </TabsContent>
           </Tabs>
 
-          {validationResult && (
-            <div className="mt-6 space-y-3">
-              <h3 className="font-semibold text-sm">Validation Results</h3>
-
-              {validationResult.valid ? (
-                <Alert className="border-green-200 bg-green-100 dark:border-green-900/50 dark:bg-green-900/30">
-                  <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  <AlertDescription className="text-green-700 dark:text-green-400">
-                    ✓ JSON is valid! Ready to import {validationResult.count} question
-                    {validationResult.count !== 1 ? "s" : ""}.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert className="border-red-200 bg-red-100 dark:border-red-900/50 dark:bg-red-900/30">
-                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                  <AlertDescription className="text-red-700 dark:text-red-400">
-                    Validation failed. See errors below.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {validationResult.preview && validationResult.preview.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    Questions found ({validationResult.preview.length})
-                  </p>
-                  <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
-                    {validationResult.preview.map((q, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                      >
-                        <span className="truncate">{q.title}</span>
-                        <span className="flex items-center gap-2 shrink-0 text-xs text-muted-foreground">
-                          <span className="rounded-full bg-muted px-2 py-0.5 uppercase tracking-wide">
-                            {q.type}
-                          </span>
-                          {q.difficulty && <span>{q.difficulty}</span>}
-                          {q.marks !== undefined && <span>{q.marks} pts</span>}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {validationResult.errors.length > 0 && (
-                <div className="bg-muted border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                  {validationResult.errors.map((err, idx) => (
-                    <div
-                      key={idx}
-                      className="text-xs text-red-700 dark:text-red-400 flex items-start gap-2"
-                    >
-                      <span className="text-red-500 dark:text-red-400 mt-0.5">•</span>
-                      <span>
-                        {err.index !== undefined && (
-                          <span className="font-mono">
-                            [Question {err.index}]
-                          </span>
-                        )}
-                        {err.field && <span className="font-mono"> {err.field}:</span>}
-                        {` ${err.message}`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {validationResult.warnings && validationResult.warnings.length > 0 && (
-                <div className="bg-yellow-100 border border-yellow-200 dark:bg-yellow-900/30 dark:border-yellow-900/50 rounded-lg p-3 space-y-2">
-                  {validationResult.warnings.map((warn, idx) => (
-                    <div
-                      key={idx}
-                      className="text-xs text-yellow-700 dark:text-yellow-400 flex items-start gap-2"
-                    >
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <span>{warn}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {importStatus && (
-            <Alert
-              className={
-                importStatus.success
-                  ? "border-green-200 bg-green-100 dark:border-green-900/50 dark:bg-green-900/30 mt-6"
-                  : "border-red-200 bg-red-100 dark:border-red-900/50 dark:bg-red-900/30 mt-6"
-              }
-            >
-              {importStatus.success ? (
-                <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-              )}
-              <AlertDescription
-                className={
-                  importStatus.success
-                    ? "text-green-700 dark:text-green-400"
-                    : "text-red-700 dark:text-red-400"
-                }
-              >
-                {importStatus.message}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="mt-8 flex gap-3 justify-end">
-            <Button onClick={onClose} variant="outline">
-              Close
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={!validationResult?.valid || isLoading}
-              className="gap-2"
-            >
-              {isLoading ? "Importing..." : "Import Questions"}
-            </Button>
-          </div>
+          {/* Results follow the editor on mobile, where the side panel collapses into the flow */}
+          <div className="mt-4 lg:hidden">{resultsPanel}</div>
         </div>
-      </Card>
-    </div>
+
+        {/* Results pane */}
+        <div className="hidden min-h-0 border-l bg-muted/20 px-6 py-6 lg:block lg:h-full lg:overflow-y-auto lg:px-8 lg:py-8">
+          {resultsPanel}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4 lg:px-10">
+        <Button onClick={onClose} variant="outline">
+          Close
+        </Button>
+        <Button
+          onClick={handleImport}
+          disabled={!validationResult?.valid || isLoading}
+        >
+          {isLoading ? "Importing..." : "Import Questions"}
+        </Button>
+      </div>
+    </div>,
+    document.body
   );
 }
