@@ -4,16 +4,13 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCloneTest } from "@/hooks/use-clone-test";
 import {
   ArrowLeft,
-  Edit,
   BarChart3,
   CheckCircle,
   XCircle,
   Play,
-  Copy,
-  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { Test } from "@/types/test";
 import { getTestStatusBadgeVariant, getTestStatusLabel } from "@/lib/test-status";
@@ -23,7 +20,6 @@ interface TestDetailHeaderProps {
 }
 
 export function TestDetailHeader({ test }: TestDetailHeaderProps) {
-  const { isCloning, handleClone } = useCloneTest(test.id as string);
   const statusLabel = getTestStatusLabel(test.status);
   const statusVariant = getTestStatusBadgeVariant(test.status);
 
@@ -76,44 +72,12 @@ export function TestDetailHeader({ test }: TestDetailHeaderProps) {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          {test.status === "waiting" ? (
-            <>
-              <Button 
-                onClick={() => handleClone()}
-                disabled={isCloning}
-                variant="outline"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors w-full sm:w-auto text-muted-foreground hover:text-foreground"
-              >
-                {isCloning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
-                Clone
-              </Button>
-              <Link href={`/admin/tests/${test.id}/edit`}>
-                <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-lg transition-colors w-full sm:w-auto">
-                  <Edit className="h-4 w-4" />
-                  Edit Test
-                </Button>
-              </Link>
-            </>
-          ) : (
-            <>
-              <Button 
-                onClick={() => handleClone()}
-                disabled={isCloning}
-                variant="outline"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors w-full sm:w-auto text-muted-foreground hover:text-foreground"
-              >
-                {isCloning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
-                Clone
-              </Button>
-              <Button
-                disabled
-                className="flex items-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-lg cursor-not-allowed w-full sm:w-auto"
-              >
-                <Edit className="h-4 w-4" />
-                Edit Test
-              </Button>
-            </>
-          )}
+          <Link href={`/test/${test.id}`} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors w-full sm:w-auto text-muted-foreground hover:text-foreground">
+              <ExternalLink className="h-4 w-4" />
+              Open
+            </Button>
+          </Link>
           <Link href={`/admin/tests/${test.id}/result`}>
             <Button className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground px-4 py-2 rounded-lg transition-colors w-full sm:w-auto">
               <BarChart3 className="h-4 w-4" />

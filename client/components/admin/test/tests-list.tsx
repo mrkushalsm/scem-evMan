@@ -13,6 +13,7 @@ export interface MongoTestContent {
   description: string;
   startsAt?: string;
   startTime?: string;
+  endsAt?: string;
   endTime?: string;
   status?: string;
   problemCount?: number;
@@ -55,6 +56,7 @@ export function TestsList({ initialTests }: Props) {
       problems: (t.questions || []) as string[],
       duration: t.duration || durationStr.trim(),
       startsAt: t.startsAt || t.startTime || '',
+      endsAt: t.endsAt || t.endTime || '',
        participantsInProgress: t.participantsInProgress ?? t.participants ?? 0,
        participantsCompleted: t.participantsCompleted ?? 0,
        joinId: t.joinId || '',

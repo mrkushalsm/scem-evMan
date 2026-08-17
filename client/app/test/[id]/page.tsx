@@ -4,10 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "@/components/ui/banner";
-import { Clock, AlertCircle, Calendar, Hourglass } from "lucide-react";
+import { AlertCircle, Calendar, Hourglass, CalendarX2, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { getBaseUrl } from "@/lib/env";
 import { getContestLanding, startTest, getContestData } from "@/actions/contest";
 import { clearAttemptIntegrityState } from "@/lib/attempt-integrity";
 
@@ -16,6 +14,7 @@ interface ContestDetails {
   description: string;
   rules: string[];
   duration: number;
+  totalProblems: number;
   startTime: string;
   endTime: string;
   serverTime: string;
@@ -173,19 +172,27 @@ export default function ContestLanding() {
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1]">{details?.title}</h1>
             <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">{details?.description}</p>
             
-            <div className="flex flex-wrap items-center gap-8 pt-4 text-sm font-medium text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-primary/60" />
-                <span>{details ? new Date(details.startTime).toLocaleDateString() : "-"}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-primary/60" />
-                <span>{details ? new Date(details.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : "-"}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Hourglass className="h-5 w-5 text-primary/60" />
-                <span>{details?.duration} Minutes</span>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 max-w-3xl">
+              <InfoStat
+                icon={<Calendar className="h-4 w-4" />}
+                label="Starts"
+                value={details ? new Date(details.startTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "-"}
+              />
+              <InfoStat
+                icon={<Hourglass className="h-4 w-4" />}
+                label="Duration"
+                value={`${details?.duration ?? "-"} min`}
+              />
+              <InfoStat
+                icon={<CalendarX2 className="h-4 w-4" />}
+                label="Ends"
+                value={details ? new Date(details.endTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "-"}
+              />
+              <InfoStat
+                icon={<ListChecks className="h-4 w-4" />}
+                label="Questions"
+                value={`${details?.totalProblems ?? "-"}`}
+              />
             </div>
           </div>
 
@@ -231,7 +238,7 @@ export default function ContestLanding() {
                   <span className="w-2 h-2 rounded-full bg-muted-foreground"></span>
                   Starting In
                 </div>
-                <p className="text-5xl font-mono font-light tracking-tight text-foreground">{timeLeft}</p>
+                <p className="text-5xl font-mono font-light tracking-tight text-foreground text-center tabular-nums h-14 flex items-center justify-center">{timeLeft || "00:00:00"}</p>
                 <Button disabled className="w-full h-14 text-md rounded-full shadow-sm" variant="outline">Entry Locked</Button>
                 <p className="text-xs text-muted-foreground text-center">The assessment will unlock automatically.</p>
               </div>
@@ -283,5 +290,17 @@ export default function ContestLanding() {
         </div>
       )}
     </>
+  );
+}
+
+function InfoStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+      <div className="text-primary/70">{icon}</div>
+      <div className="min-w-0">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-sm font-semibold text-foreground truncate">{value}</div>
+      </div>
+    </div>
   );
 }

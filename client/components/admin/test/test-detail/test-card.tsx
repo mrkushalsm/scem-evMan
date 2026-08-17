@@ -47,17 +47,20 @@ export function TestInformationCard({ test }: TestInformationCardProps) {
           </div>
         </div>
 
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground font-medium">Ends At</span>
+          <div className="flex items-center gap-2 text-foreground">
+            <Calendar className="h-4 w-4 text-primary/50" />
+            <span className="font-semibold text-sm sm:text-base">
+              {new Date(test.endsAt || "").toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+            </span>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between overflow-hidden gap-4">
           <span className="text-muted-foreground font-medium whitespace-nowrap">Join Code</span>
           <span className="text-primary font-bold font-mono text-lg tracking-widest bg-primary/10 px-3 py-1 rounded-md border border-primary/20 truncate">
             {test.joinId}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between overflow-hidden gap-4">
-          <span className="text-muted-foreground font-medium whitespace-nowrap">Test ID</span>
-          <span className="text-foreground font-semibold font-mono text-xs sm:text-sm opacity-70 truncate">
-            #{test.id}
           </span>
         </div>
       </CardContent>

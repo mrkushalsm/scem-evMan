@@ -348,6 +348,7 @@ const getAdminContests = async (req, res, next) => {
                 participantsInProgress: ongoing,
                 problemCount: c.questions ? c.questions.length : 0,
                 startsAt: c.startTime,
+                endsAt: c.endTime,
                 duration: durationStr.trim(),
                 joinId: c.joinId
             };

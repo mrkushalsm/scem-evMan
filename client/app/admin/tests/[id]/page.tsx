@@ -58,6 +58,7 @@ export default async function AdminTestDetailPage({
         description: data.description as string,
         duration: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
         startsAt: startTime,
+        endsAt: endTime,
         problems: ((data.questions as Record<string, unknown>[]) || []).map((q) => ({
           ...q,
           id: (q?._id as string) ?? (q?.id as string),

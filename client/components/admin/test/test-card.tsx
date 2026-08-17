@@ -47,11 +47,19 @@ export function TestCard({ test }: { test: Test }) {
 
       <CardContent>
         {/* Created At */}
-        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-4 p-3 bg-muted border rounded-lg">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2 p-3 bg-muted border rounded-lg">
           <Clock className="h-4 w-4 text-foreground shrink-0" />
           <span className="font-medium">Starts:</span>
           <span className="truncate">
             {new Date(test.startsAt).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-muted-foreground text-sm mb-4 p-3 bg-muted border rounded-lg">
+          <Clock className="h-4 w-4 text-foreground shrink-0" />
+          <span className="font-medium">Ends:</span>
+          <span className="truncate">
+            {new Date(test.endsAt || "").toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
           </span>
         </div>
 
