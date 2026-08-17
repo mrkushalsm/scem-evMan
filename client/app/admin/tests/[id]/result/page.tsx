@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/ui/local-time";
+import ExportResultsButtons from "@/components/admin/test/export-results-buttons";
 
 /* ---------- Types ---------- */
 interface Participant {
@@ -130,6 +131,7 @@ export default async function AdminTestResultPage({ params }: { params: Promise<
                             </p>
                         </div>
                     </div>
+                    <ExportResultsButtons contestId={data.id} contestTitle={data.testName} />
                 </header>
 
                 <section className="space-y-6">
