@@ -93,26 +93,18 @@ const createProblem = async (req, res, next) => {
                 }
             });
 
-            supportedLangs.forEach(lang => {
+            // A failure here would save the client's "// auto-generated" sentinel as the
+            // candidate's stub, so surface it rather than persisting placeholder code.
+            for (const lang of supportedLangs) {
                 // Only generate if the user selected this language (sent as key in boilerplateCode)
                 if (Object.prototype.hasOwnProperty.call(boilerplateCode, lang)) {
                     try {
-                        const judge = getJudge(lang);
-                        const code = judge.generateBoilerplate({
-                            method,
-                            input: inputs
-                        });
-                        boilerplateCode[lang] = code;
+                        boilerplateCode[lang] = getJudge(lang).generateBoilerplate({ method, input: inputs });
                     } catch (err) {
-                        console.error(`ERROR generating boilerplate for ${lang}:`, err);
-                        console.warn(`Skipping boilerplate for ${lang}: ${err.message}`);
-                        // Clear the placeholder if generation fails
-                        if (boilerplateCode[lang] === "// auto-generated") {
-                            boilerplateCode[lang] = "";
-                        }
+                        return res.status(400).json({ success: false, error: `Could not generate ${lang} boilerplate: ${err.message}` });
                     }
                 }
-            });
+            }
         }
 
         const newQuestion = new Question({
@@ -199,20 +191,17 @@ const updateProblem = async (req, res, next) => {
                 }
             });
 
-            supportedLangs.forEach(lang => {
+            // Failing here would leave the previous signature's stub on a question whose
+            // driver has already changed, so surface it instead of keeping stale code.
+            for (const lang of supportedLangs) {
                 if (Object.prototype.hasOwnProperty.call(boilerplateCode, lang)) {
                     try {
-                        const judge = getJudge(lang);
-                        const code = judge.generateBoilerplate({
-                            method,
-                            input: inputs
-                        });
-                        boilerplateCode[lang] = code;
+                        boilerplateCode[lang] = getJudge(lang).generateBoilerplate({ method, input: inputs });
                     } catch (err) {
-                        console.warn(`Skipping boilerplate for ${lang}: ${err.message}`);
+                        return res.status(400).json({ success: false, error: `Could not generate ${lang} boilerplate: ${err.message}` });
                     }
                 }
-            });
+            }
         }
 
         const updates = {

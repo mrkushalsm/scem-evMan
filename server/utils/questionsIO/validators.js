@@ -1,5 +1,10 @@
 const { z } = require("zod");
-const { SUPPORTED_TYPES, validateProblemConfig } = require("@pomelo/code-gen");
+const {
+  SUPPORTED_TYPES,
+  validateProblemConfig,
+  validateValues,
+  parseTokens,
+} = require("@pomelo/code-gen");
 
 // Base schema for all questions
 const baseQuestionSchema = z.object({
@@ -41,15 +46,32 @@ const codingQuestionSchema = baseQuestionSchema.extend({
     .min(1, "At least one input variable is required"),
   testcases: z.array(testCaseSchema).optional(),
 }).superRefine((coding, ctx) => {
-  validateProblemConfig({
+  const signatureErrors = validateProblemConfig({
     method: coding.functionName,
     input: coding.inputVariables,
-  }).forEach((message) => {
+  });
+
+  signatureErrors.forEach((message) => {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["inputVariables"],
       message,
     });
+  });
+
+  // Only meaningful once the signature itself is sound — the wire format is
+  // read positionally against inputVariables.
+  if (signatureErrors.length > 0) return;
+
+  (coding.testcases || []).forEach((testcase, index) => {
+    validateValues(parseTokens(testcase.input, coding.inputVariables), coding.inputVariables)
+      .forEach(({ message }) => {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["testcases", index, "input"],
+          message,
+        });
+      });
   });
 });
 

@@ -58,7 +58,7 @@ either `"coding"` or `"mcq"`, with the fields below.
   "outputFormat": "string — describes what's printed to stdout, see §6",
   "functionName": "string — camelCase, e.g. twoSum",
   "inputVariables": [
-    { "variable": "string", "type": "int" | "long" | "float" | "double" | "bool" | "char" | "string" | "int_array" | "float_array" | "string_array" | "int_matrix" }
+    { "variable": "string", "type": "int" | "long" | "float" | "double" | "bool" | "char" | "string" | "int_array" | "float_array" | "string_array" | "int_matrix" | "int_linked_list" | "string_linked_list" | "int_linked_list_cyclic" | "int_doubly_linked_list" | "int_binary_tree" | "int_binary_tree_parent" | "int_nary_tree" | "int_graph" | "int_digraph" | "int_weighted_graph" | "int_weighted_digraph" }
   ],
   "testcases": [
     { "input": "string", "output": "string", "isVisible": true, "explanation": "string (optional, required when isVisible is true)" }
@@ -171,6 +171,22 @@ matching `inputVariables` in the order they're declared:
 - Matrix types (`int_matrix`) → **rows**, then **columns**, then the
   elements in row-major order (e.g. `[[1, 2], [3, 4]]` becomes
   `2 2 1 2 3 4`). Every row must have the same length.
+- Linked lists (`int_linked_list`, `string_linked_list`,
+  `int_doubly_linked_list`) → like an array: **length**, then the node
+  values (e.g. `3 1 2 3`).
+- `int_linked_list_cyclic` → length, values, then the **index the tail
+  links back to**, or `-1` for no cycle (e.g. `3 1 2 3 1`).
+- Trees (`int_binary_tree`, `int_binary_tree_parent`) → **count**, then the
+  values in level order with `null` for absent children, LeetCode-style
+  (e.g. `[1, 2, 3, null, null, 4]` becomes `6 1 2 3 null null 4`).
+- `int_nary_tree` → **count**, then LeetCode's N-ary level order: the root,
+  `null`, then each node's children terminated by `null`
+  (e.g. `[1, null, 3, 2, 4, null, 5, 6]` becomes `8 1 null 3 2 4 null 5 6`).
+- Graphs (`int_graph`, `int_digraph`) → **node count**, **edge count**, then
+  each edge as `u v` (e.g. 4 nodes and edges 0-1, 1-2 becomes `4 2 0 1 1 2`).
+  Nodes are always numbered `0 … n-1`.
+- Weighted graphs (`int_weighted_graph`, `int_weighted_digraph`) → the same,
+  but each edge is `u v w` (e.g. `3 2 0 1 5 1 2 7`).
 - Multiple variables are concatenated left-to-right, space-separated.
 
 `output` follows the same flattening rule for whatever the program prints.
@@ -221,16 +237,37 @@ Only these `inputVariables[].type` values are valid for coding questions:
 | `float_array` | array of floats, length-prefixed per §6 |
 | `string_array` | array of string tokens, length-prefixed per §6 |
 | `int_matrix` | 2-D integer array, rows/cols-prefixed per §6 |
+| `int_linked_list` | singly linked list of integers (`ListNode`) |
+| `string_linked_list` | singly linked list of string tokens (`ListNode`) |
+| `int_linked_list_cyclic` | singly linked list that may end in a cycle (`ListNode`) |
+| `int_doubly_linked_list` | doubly linked list of integers (`DListNode`) |
+| `int_binary_tree` | binary tree of integers (`TreeNode`) — also use for BST questions |
+| `int_binary_tree_parent` | binary tree whose nodes carry a `parent` pointer (`TreeNode`) |
+| `int_nary_tree` | N-ary tree of integers (`Node`) |
+| `int_graph` | undirected unweighted graph, given as an adjacency list |
+| `int_digraph` | directed unweighted graph |
+| `int_weighted_graph` | undirected graph with integer edge weights |
+| `int_weighted_digraph` | directed graph with integer edge weights |
+
+The harness defines the node struct for you and shows it to the learner as a
+comment in their stub; it is **not** part of the answer they write. Use
+`int_matrix` for interval problems (`[start, end]` rows) — there is no
+interval type.
 
 `functionName` and every `inputVariables[].variable` must be a valid
 identifier (`[A-Za-z_][A-Za-z0-9_]*`), must not be a keyword in C, C++,
 Java or Python, and must not be a name the generated harness uses itself
 (`main`, `Main`, `Code`, `args`, `scanner`, `iterator`, `input_data`, `i`,
 `j`, `std`, `sys`, `cin`, `cout`, `printf`, `scanf`, `malloc`, `System`,
-`Scanner`). Names must be unique, and because C signatures gain a trailing
-length parameter for arrays and matrices, no variable may be named
-`<array>_size`, `<matrix>_rows` or `<matrix>_cols`. Questions violating any
-of these are rejected at import.
+`Scanner`, `ListNode`, `DListNode`, `TreeNode`, `Node`, `Graph`, `WGraph`).
+Names must be unique, and no variable may be named `<other>_size`,
+`<other>_rows`, `<other>_cols`, `<other>_n` or similar, since the harness
+generates those alongside arrays, matrices and data structures.
+
+Two types that define the same struct with different fields cannot appear in
+one question — e.g. `int_binary_tree` with `int_binary_tree_parent`, or
+`int_linked_list` with `string_linked_list`. Questions violating any of
+these rules are rejected at import.
 
 ### 8. Supported languages
 
@@ -316,7 +353,7 @@ either `"coding"` or `"mcq"`, with the fields below.
   "outputFormat": "string — describes what's printed to stdout, see §6",
   "functionName": "string — camelCase, e.g. twoSum",
   "inputVariables": [
-    { "variable": "string", "type": "int" | "long" | "float" | "double" | "bool" | "char" | "string" | "int_array" | "float_array" | "string_array" | "int_matrix" }
+    { "variable": "string", "type": "int" | "long" | "float" | "double" | "bool" | "char" | "string" | "int_array" | "float_array" | "string_array" | "int_matrix" | "int_linked_list" | "string_linked_list" | "int_linked_list_cyclic" | "int_doubly_linked_list" | "int_binary_tree" | "int_binary_tree_parent" | "int_nary_tree" | "int_graph" | "int_digraph" | "int_weighted_graph" | "int_weighted_digraph" }
   ],
   "testcases": [
     { "input": "string", "output": "string", "isVisible": true, "explanation": "string (optional, required when isVisible is true)" }
@@ -426,6 +463,22 @@ matching `inputVariables` in the order they're declared:
 - Matrix types (`int_matrix`) → **rows**, then **columns**, then the
   elements in row-major order (e.g. `[[1, 2], [3, 4]]` becomes
   `2 2 1 2 3 4`). Every row must have the same length.
+- Linked lists (`int_linked_list`, `string_linked_list`,
+  `int_doubly_linked_list`) → like an array: **length**, then the node
+  values (e.g. `3 1 2 3`).
+- `int_linked_list_cyclic` → length, values, then the **index the tail
+  links back to**, or `-1` for no cycle (e.g. `3 1 2 3 1`).
+- Trees (`int_binary_tree`, `int_binary_tree_parent`) → **count**, then the
+  values in level order with `null` for absent children, LeetCode-style
+  (e.g. `[1, 2, 3, null, null, 4]` becomes `6 1 2 3 null null 4`).
+- `int_nary_tree` → **count**, then LeetCode's N-ary level order: the root,
+  `null`, then each node's children terminated by `null`
+  (e.g. `[1, null, 3, 2, 4, null, 5, 6]` becomes `8 1 null 3 2 4 null 5 6`).
+- Graphs (`int_graph`, `int_digraph`) → **node count**, **edge count**, then
+  each edge as `u v` (e.g. 4 nodes and edges 0-1, 1-2 becomes `4 2 0 1 1 2`).
+  Nodes are always numbered `0 … n-1`.
+- Weighted graphs (`int_weighted_graph`, `int_weighted_digraph`) → the same,
+  but each edge is `u v w` (e.g. `3 2 0 1 5 1 2 7`).
 - Multiple variables are concatenated left-to-right, space-separated.
 
 `output` follows the same flattening rule for whatever the program prints.
@@ -476,16 +529,37 @@ Only these `inputVariables[].type` values are valid for coding questions:
 | `float_array` | array of floats, length-prefixed per §6 |
 | `string_array` | array of string tokens, length-prefixed per §6 |
 | `int_matrix` | 2-D integer array, rows/cols-prefixed per §6 |
+| `int_linked_list` | singly linked list of integers (`ListNode`) |
+| `string_linked_list` | singly linked list of string tokens (`ListNode`) |
+| `int_linked_list_cyclic` | singly linked list that may end in a cycle (`ListNode`) |
+| `int_doubly_linked_list` | doubly linked list of integers (`DListNode`) |
+| `int_binary_tree` | binary tree of integers (`TreeNode`) — also use for BST questions |
+| `int_binary_tree_parent` | binary tree whose nodes carry a `parent` pointer (`TreeNode`) |
+| `int_nary_tree` | N-ary tree of integers (`Node`) |
+| `int_graph` | undirected unweighted graph, given as an adjacency list |
+| `int_digraph` | directed unweighted graph |
+| `int_weighted_graph` | undirected graph with integer edge weights |
+| `int_weighted_digraph` | directed graph with integer edge weights |
+
+The harness defines the node struct for you and shows it to the learner as a
+comment in their stub; it is **not** part of the answer they write. Use
+`int_matrix` for interval problems (`[start, end]` rows) — there is no
+interval type.
 
 `functionName` and every `inputVariables[].variable` must be a valid
 identifier (`[A-Za-z_][A-Za-z0-9_]*`), must not be a keyword in C, C++,
 Java or Python, and must not be a name the generated harness uses itself
 (`main`, `Main`, `Code`, `args`, `scanner`, `iterator`, `input_data`, `i`,
 `j`, `std`, `sys`, `cin`, `cout`, `printf`, `scanf`, `malloc`, `System`,
-`Scanner`). Names must be unique, and because C signatures gain a trailing
-length parameter for arrays and matrices, no variable may be named
-`<array>_size`, `<matrix>_rows` or `<matrix>_cols`. Questions violating any
-of these are rejected at import.
+`Scanner`, `ListNode`, `DListNode`, `TreeNode`, `Node`, `Graph`, `WGraph`).
+Names must be unique, and no variable may be named `<other>_size`,
+`<other>_rows`, `<other>_cols`, `<other>_n` or similar, since the harness
+generates those alongside arrays, matrices and data structures.
+
+Two types that define the same struct with different fields cannot appear in
+one question — e.g. `int_binary_tree` with `int_binary_tree_parent`, or
+`int_linked_list` with `string_linked_list`. Questions violating any of
+these rules are rejected at import.
 
 ### 8. Supported languages
 

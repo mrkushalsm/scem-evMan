@@ -1,9 +1,11 @@
 const mongoose = require("mongoose");
 const { getJudge, validateProblemConfig } = require("@pomelo/code-gen");
 
+// Version 5, not 4: an earlier build shipped this as two separate migrations, so a
+// database that already ran the first one must still pick up the merged version.
 module.exports = {
-  version: 4,
-  name: "Regenerate coding boilerplate for the new C/C++ signatures",
+  version: 5,
+  name: "Regenerate coding boilerplate for the current signatures and struct preambles",
   up: async () => {
     const questions = mongoose.connection.db.collection("questions");
     const cursor = questions.find({ type: "coding" });

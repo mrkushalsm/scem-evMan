@@ -23,110 +23,20 @@ import {
     SelectValue,
     SelectContent,
     SelectItem,
+    SelectGroup,
+    SelectLabel,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Beaker, Plus, Trash2, Code2 } from "lucide-react";
-import { SUPPORTED_TYPES, validateProblemConfig } from "@pomelo/code-gen";
+import { TYPE_REGISTRY, emptyValue, validateProblemConfig } from "@pomelo/code-gen";
+import { ValueEditor } from "./editors";
 
-function ElementList({
-    value,
-    onChange,
-    label,
-}: {
-    value: unknown;
-    onChange: (next: string[]) => void;
-    label: string;
-}) {
-    const arr: string[] = Array.isArray(value) ? value : [];
-    return (
-        <div className="space-y-1.5">
-            {arr.map((elem, eIdx) => (
-                <div key={eIdx} className="flex gap-1.5">
-                    <Input
-                        value={elem ?? ""}
-                        onChange={(e) => {
-                            const next = [...arr];
-                            next[eIdx] = e.target.value;
-                            onChange(next);
-                        }}
-                        className="h-8 text-sm flex-1"
-                        placeholder={`${label} ${eIdx + 1}`}
-                    />
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => onChange(arr.filter((_, i) => i !== eIdx))}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                </div>
-            ))}
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full h-7 text-xs mt-1"
-                onClick={() => onChange([...arr, ""])}
-            >
-                <Plus className="h-3 w-3 mr-1" /> Add {label}
-            </Button>
-        </div>
-    );
-}
-
-function MatrixEditor({
-    value,
-    onChange,
-}: {
-    value: unknown;
-    onChange: (next: string[][]) => void;
-}) {
-    const rows: string[][] = Array.isArray(value)
-        ? value.map((r) => (Array.isArray(r) ? r : []))
-        : [];
-    const width = rows[0]?.length ?? 0;
-
-    return (
-        <div className="space-y-2">
-            {rows.map((row, rIdx) => (
-                <div key={rIdx} className="p-2 border rounded-md space-y-1.5">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Row {rIdx + 1}</span>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-destructive"
-                            onClick={() => onChange(rows.filter((_, i) => i !== rIdx))}
-                        >
-                            <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                    </div>
-                    <ElementList
-                        value={row}
-                        onChange={(next) => {
-                            const updated = [...rows];
-                            updated[rIdx] = next;
-                            onChange(updated);
-                        }}
-                        label="Column"
-                    />
-                </div>
-            ))}
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full h-7 text-xs"
-                onClick={() => onChange([...rows, Array.from({ length: width }, () => "")])}
-            >
-                <Plus className="h-3 w-3 mr-1" /> Add Row
-            </Button>
-        </div>
-    );
-}
+const TYPE_GROUPS: [string, string[]][] = Object.entries(
+    Object.entries(TYPE_REGISTRY).reduce<Record<string, string[]>>((groups, [type, record]) => {
+        (groups[record.group] ||= []).push(type);
+        return groups;
+    }, {})
+);
 
 export default function TestCaseCard() {
     const { control, watch } = useFormContext();
@@ -157,6 +67,11 @@ export default function TestCaseCard() {
         input: inputVariables,
     });
     const isVariableInvalid = signatureErrors.length > 0;
+
+    const emptyInput = () =>
+        Object.fromEntries(
+            inputVariables.map((v: { variable: string; type: string }) => [v.variable, emptyValue(v.type)])
+        );
 
     return (
         <div className="space-y-6">
@@ -232,10 +147,15 @@ export default function TestCaseCard() {
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {SUPPORTED_TYPES.map((type) => (
-                                                        <SelectItem key={type} value={type}>
-                                                            {type}
-                                                        </SelectItem>
+                                                    {TYPE_GROUPS.map(([group, types]) => (
+                                                        <SelectGroup key={group}>
+                                                            <SelectLabel>{group}</SelectLabel>
+                                                            {types.map((type) => (
+                                                                <SelectItem key={type} value={type}>
+                                                                    {type}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectGroup>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -304,7 +224,7 @@ export default function TestCaseCard() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => appendTestCase({ input: {}, output: "", explanation: "", isVisible: false })}
+                                    onClick={() => appendTestCase({ input: emptyInput(), output: "", explanation: "", isVisible: false })}
                                     disabled={isVariableInvalid}
                                 >
                                     <Plus className="h-4 w-4 mr-2" />
@@ -365,20 +285,12 @@ export default function TestCaseCard() {
                                                             <FormItem>
                                                                 <FormLabel className="text-xs">{variable.variable} <span className="text-muted-foreground font-normal">({variable.type})</span></FormLabel>
                                                                 <FormControl>
-                                                                    {variable.type.endsWith("_matrix") ? (
-                                                                        <MatrixEditor
-                                                                            value={field.value}
-                                                                            onChange={field.onChange}
-                                                                        />
-                                                                    ) : variable.type.endsWith("_array") ? (
-                                                                        <ElementList
-                                                                            value={field.value}
-                                                                            onChange={field.onChange}
-                                                                            label="Element"
-                                                                        />
-                                                                    ) : (
-                                                                        <Input {...field} value={field.value ?? ""} placeholder={`Value for ${variable.variable}`} className="h-8 text-sm" />
-                                                                    )}
+                                                                    <ValueEditor
+                                                                        type={variable.type}
+                                                                        value={field.value}
+                                                                        onChange={field.onChange}
+                                                                        variable={variable.variable}
+                                                                    />
                                                                 </FormControl>
                                                                 <FormMessage />
                                                             </FormItem>

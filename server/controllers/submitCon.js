@@ -2,7 +2,7 @@ const Submission = require("../models/Submissions");
 const Question = require("../models/Question");
 const Contest = require("../models/Contest");
 const { languageIds } = require("../utils/languages");
-const { getJudge } = require("@pomelo/code-gen");
+const { getJudge, serializeValues, validateValues } = require("@pomelo/code-gen");
 
 const resolveContestFromRequest = async (req) => {
     const contestId = req.params.id || req.body.contestId || req.contest?._id;
@@ -39,30 +39,12 @@ const MAX_CODE_LENGTH = 65536;
 // Serializes one test case's input into stdin: values in declared order, arrays as length + elements.
 const buildStdin = (question, tc) => {
     if (typeof tc.input === "object" && tc.input !== null) {
-        const values = [];
-        for (const inputVar of (question.inputVariables || [])) {
-            const value = tc.input[inputVar.variable];
-            if (value === undefined) {
-                throw new Error(`test case is missing a value for "${inputVar.variable}"`);
-            }
-            if (inputVar.type && inputVar.type.endsWith("_matrix")) {
-                const rows = Array.isArray(value) ? value : [];
-                const cols = rows.length > 0 ? rows[0].length : 0;
-                if (rows.some((row) => !Array.isArray(row) || row.length !== cols)) {
-                    throw new Error(`matrix "${inputVar.variable}" has rows of differing lengths`);
-                }
-                values.push(rows.length, cols);
-                values.push(...rows.flat());
-            } else if (Array.isArray(value)) {
-                values.push(value.length);
-                values.push(...value);
-            } else if (typeof value === "boolean") {
-                values.push(value ? 1 : 0);
-            } else {
-                values.push(value);
-            }
+        const variables = question.inputVariables || [];
+        const errors = validateValues(tc.input, variables);
+        if (errors.length > 0) {
+            throw new Error(errors.map((e) => e.message).join("; "));
         }
-        return values.join(" ");
+        return serializeValues(tc.input, variables);
     }
     if (typeof tc.input === "string") {
         return tc.input.trim().replace(/,/g, " ").replace(/\s+/g, " ");

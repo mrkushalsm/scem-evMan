@@ -20,4 +20,7 @@ export function getJudge(lang: string): Judge {
 }
 
 export * from "./types";
+export * from "./registry";
+export * from "./kinds";
+export * from "./wire";
 export * from "./validate";

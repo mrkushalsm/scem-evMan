@@ -10,6 +10,16 @@ import DescriptionPanel from "./description";
 import TestCasePanel from "./test-case";
 import { CodingProblem } from "@/types/problem";
 
+// Drafts are keyed by the stub they were started from, not just the question, so a
+// question whose signature changed cannot restore code written against the old one.
+function fingerprint(source: string): string {
+  let hash = 5381;
+  for (let i = 0; i < source.length; i++) {
+    hash = ((hash << 5) + hash + source.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export function CodeScreen({
   problem,
   draftKeyPrefix = "pomelo_draft",
@@ -25,24 +35,32 @@ export function CodeScreen({
   const [code, setCode] = useState(problem.savedCode || (problem.boilerplateCode && availableLanguages.length > 0 ? (problem.boilerplateCode[initialLanguage as keyof typeof problem.boilerplateCode] || "") : "// Start coding here"));
   const [isMounted, setIsMounted] = useState(false);
 
+  const draftKey = React.useCallback(
+    (lang: string) => {
+      const stub = problem.boilerplateCode?.[lang as keyof typeof problem.boilerplateCode] || "";
+      return `${draftKeyPrefix}_${problem.id}_${lang}_${fingerprint(stub)}`;
+    },
+    [problem.id, problem.boilerplateCode, draftKeyPrefix]
+  );
+
   React.useEffect(() => {
     setIsMounted(true);
     // If we do not have a saved code from the server for the current initial language, check local storage
     if (!problem.savedCode) {
       try {
-        const draft = localStorage.getItem(`${draftKeyPrefix}_${problem.id}_${initialLanguage}`);
+        const draft = localStorage.getItem(draftKey(initialLanguage));
         if (draft) setCode(draft);
       } catch { /* localStorage unavailable (e.g. private browsing) */ }
     }
-  }, [problem.id, initialLanguage, problem.savedCode, draftKeyPrefix]);
+  }, [initialLanguage, problem.savedCode, draftKey]);
 
   React.useEffect(() => {
     if (isMounted && code !== "") {
       try {
-        localStorage.setItem(`${draftKeyPrefix}_${problem.id}_${language}`, code);
+        localStorage.setItem(draftKey(language), code);
       } catch { /* localStorage unavailable */ }
     }
-  }, [code, language, problem.id, isMounted, draftKeyPrefix]);
+  }, [code, language, isMounted, draftKey]);
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
@@ -55,7 +73,7 @@ export function CodeScreen({
 
     // Try loading from local storage
     let draft: string | null = null;
-    try { draft = localStorage.getItem(`${draftKeyPrefix}_${problem.id}_${newLang}`); } catch { /* unavailable */ }
+    try { draft = localStorage.getItem(draftKey(newLang)); } catch { /* unavailable */ }
     if (draft) {
       setCode(draft);
     } else {

@@ -1,14 +1,32 @@
+export interface SizeParam {
+    decl: string;
+    name: string;
+}
+
 export interface TypeConfig {
-    reader: string;
+    reader: string | string[];
     hint: string;
-    sizeParams?: string[];
+    parse?: string;
+    preamble?: string | string[];
+    sizeParams?: SizeParam[];
     selfDeclaring?: boolean;
 }
 
 export interface LanguageConfig {
     boilerplate: string;
     template: string;
+    lineComment: string;
     types: Record<string, TypeConfig>;
+    structures?: Record<string, TypeConfig>;
+}
+
+export interface ResolvedType {
+    hint: string;
+    reader: string;
+    preamble?: string;
+    preambleKey: string;
+    sizeParams: SizeParam[];
+    selfDeclaring: boolean;
 }
 
 export interface ProblemInput {

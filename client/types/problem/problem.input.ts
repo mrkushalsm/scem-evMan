@@ -1,5 +1,10 @@
 import z from "zod/v3";
-import { SUPPORTED_TYPES, validateProblemConfig } from "@pomelo/code-gen";
+import {
+  SUPPORTED_TYPES,
+  validateProblemConfig,
+  validateValues,
+  parseTokens,
+} from "@pomelo/code-gen";
 // import { BaseProblem, CodingProblem, MCQProblem } from "./problem.types";
 
 // type CreateFrom<T extends BaseProblem> = Omit<T, "id">;
@@ -72,14 +77,41 @@ export const questionSchema = z
   .discriminatedUnion("type", [codingSchema, mcqSchema])
   .superRefine((question, ctx) => {
     if (question.type !== "coding") return;
-    validateProblemConfig({
+
+    const signatureErrors = validateProblemConfig({
       method: question.functionName,
       input: question.inputVariables,
-    }).forEach((message) => {
+    });
+
+    signatureErrors.forEach((message) => {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["inputVariables"],
         message,
+      });
+    });
+
+    // Values are positional against inputVariables, so checking them against a
+    // broken signature would only produce noise.
+    if (signatureErrors.length > 0) return;
+
+    (question.testCases ?? []).forEach((testCase, index) => {
+      // The form holds inputs as an object keyed by variable; once submitted they
+      // have been flattened to a stdin string. This schema validates both, because
+      // the server action re-parses the payload after that flattening.
+      const values =
+        typeof testCase.input === "string"
+          ? parseTokens(testCase.input, question.inputVariables)
+          : ((testCase.input ?? {}) as Record<string, unknown>);
+
+      validateValues(values, question.inputVariables).forEach(({ variable, message }) => {
+        // This path is the one TestCaseCard binds its FormField to, so the
+        // message renders under the offending input with no extra UI.
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["testCases", index, "input", variable],
+          message,
+        });
       });
     });
   });

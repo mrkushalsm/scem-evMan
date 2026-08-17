@@ -8,8 +8,9 @@ import { QuestionSchema, questionSchema } from "@/types/problem";
 import { saveQuestion } from "@/actions/save-question";
 
 import { Form } from "@/components/ui/form";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Save, ArrowLeft, Eye } from "lucide-react";
+import { Save, ArrowLeft, Eye, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import BasicInfoCard from "./shared/info-card";
 import MCQCard from "./mcq/mcq-card";
@@ -25,6 +26,17 @@ interface Props {
   type: "coding" | "mcq";
   isCreating: boolean;
   initialData?: Partial<QuestionSchema> | null;
+}
+
+// Test-case errors sit far down a long form, so the inline FormMessage alone is
+// easy to miss. Flatten react-hook-form's nested error tree for a summary.
+function collectMessages(errors: unknown): string[] {
+  if (!errors || typeof errors !== "object") return [];
+
+  const node = errors as Record<string, unknown> & { message?: unknown };
+  if (typeof node.message === "string" && node.message) return [node.message];
+
+  return Object.values(node).flatMap(collectMessages);
 }
 
 export default function QuestionForm({ type, isCreating, initialData }: Props) {
@@ -111,6 +123,8 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
 
   const [isPending, startTransition] = useTransition();
 
+  const fieldErrors = [...new Set(collectMessages(form.formState.errors))];
+
   useEffect(() => {
     if (state.success) {
       router.push("/admin/questions");
@@ -126,20 +140,17 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
       submissionData.testCases &&
       submissionData.inputVariables
     ) {
-      try {
-        submissionData.testCases = submissionData.testCases.map((tc: Record<string, unknown>) => ({
-          ...tc,
-          input: serializeInput(tc.input as Record<string, unknown>, submissionData.inputVariables as InputVariable[]),
-          output: tc.output as string,
-          isVisible: tc.isVisible as boolean ?? false,
-        }));
+      // Values were validated by the schema, so serialization cannot fail here.
+      submissionData.testCases = submissionData.testCases.map((tc: Record<string, unknown>) => ({
+        ...tc,
+        input: serializeInput(tc.input as Record<string, unknown>, submissionData.inputVariables as InputVariable[]),
+        output: tc.output as string,
+        isVisible: tc.isVisible as boolean ?? false,
+      }));
 
-        startTransition(() => {
-          formAction(submissionData as QuestionSchema);
-        });
-      } catch (error) {
-        console.error("Serialization failed", error);
-      }
+      startTransition(() => {
+        formAction(submissionData as QuestionSchema);
+      });
     } else {
       startTransition(() => {
         formAction(submissionData);
@@ -207,6 +218,26 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
       <Form {...form}>
         <form id="question-form" onSubmit={handleSubmit} className="space-y-6">
           <input type="hidden" {...form.register("type")} value={type} />
+
+          {(fieldErrors.length > 0 || (!state.success && state.message)) && (
+            <Alert variant="destructive">
+              <AlertCircle />
+              <AlertTitle>
+                {fieldErrors.length > 0 ? "This question can’t be saved yet" : "Saving failed"}
+              </AlertTitle>
+              <AlertDescription>
+                {fieldErrors.length > 0 ? (
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {fieldErrors.map((message) => (
+                      <li key={message}>{message}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  state.message
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {type === "coding" ? (
             <div className="space-y-6">

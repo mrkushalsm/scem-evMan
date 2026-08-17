@@ -1,8 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod/v3";
 import { questionSchema, type QuestionSchema } from "@/types/problem";
 import { fetchBackend } from "@/lib/fetch";
+
+// A ZodError's own message is a JSON dump of every issue, which is unreadable in
+// a toast or an alert.
+const describe = (error: unknown): string => {
+  if (error instanceof ZodError) {
+    return error.issues.map((issue) => issue.message).join("; ");
+  }
+  return error instanceof Error ? error.message : "Failed to save question";
+};
 
 
 export async function saveQuestion(_prevState: Record<string, unknown>, data: QuestionSchema) {
@@ -58,7 +68,7 @@ export async function saveQuestion(_prevState: Record<string, unknown>, data: Qu
     console.error("Error saving question:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Failed to save question",
+      message: describe(error),
     };
   }
 }
