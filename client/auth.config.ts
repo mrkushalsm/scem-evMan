@@ -17,9 +17,23 @@ interface User {
 
 // Helper to mint a token for the Express Request
 // this minting happens on Next.js server side.
+const BACKEND_TOKEN_TTL_SECONDS = 2 * 24 * 60 * 60;
+const REFRESH_MARGIN_SECONDS = 10 * 60;
+
+// The NextAuth session outlives the backend token by weeks; without a refresh the user
+// stays "signed in" while every backend call 401s.
+export function shouldRefreshBackendToken(
+    expSeconds: number | undefined,
+    nowSeconds: number
+): boolean {
+    if (!expSeconds) return true;
+    return nowSeconds >= expSeconds - REFRESH_MARGIN_SECONDS;
+}
+
 async function mintBackendToken(user: User) {
     const secret = new TextEncoder().encode(process.env.AUTH_SECRET)
     const alg = 'HS256'
+    const exp = Math.floor(Date.now() / 1000) + BACKEND_TOKEN_TTL_SECONDS
 
     const jwt = await new SignJWT({
         userId: user._id || user.id,
@@ -28,10 +42,10 @@ async function mintBackendToken(user: User) {
     })
         .setProtectedHeader({ alg })
         .setIssuedAt()
-        .setExpirationTime('2d')
+        .setExpirationTime(exp)
         .sign(secret)
 
-    return jwt
+    return { jwt, exp }
 }
 
 export const authConfig = {
@@ -78,12 +92,34 @@ export const authConfig = {
                 // Mint a fresh backend token — if this fails, sign-in must fail too,
                 // otherwise the user ends up "signed in" with every backend call 401ing silently.
                 try {
-                    token.backendToken = await mintBackendToken(u);
+                    const minted = await mintBackendToken(u);
+                    token.backendToken = minted.jwt
+                    token.backendTokenExp = minted.exp
                 } catch (error) {
                     console.error("Failed to mint backend token:", error);
                     throw new Error("Failed to establish backend session");
                 }
+
+                return token
             }
+
+            // `user` is only set at sign-in, so this is the only place a long-lived
+            // session can renew its short-lived backend token.
+            if (token.id && shouldRefreshBackendToken(token.backendTokenExp, Math.floor(Date.now() / 1000))) {
+                try {
+                    const minted = await mintBackendToken({
+                        id: token.id as string,
+                        role: token.role as string,
+                        email: token.email as string,
+                    });
+                    token.backendToken = minted.jwt
+                    token.backendTokenExp = minted.exp
+                } catch (error) {
+                    // Keep the existing token; the next request tries again.
+                    console.error("Failed to refresh backend token:", error);
+                }
+            }
+
             return token
         },
         async session({ session, token }: { session: any; token: any }) {

@@ -39,7 +39,7 @@ router.get('/:id', validateContest(), getContestLanding);
 // --- AUTHENTICATED ACTIONS ---
 
 // Start Attempt (Create session) - Must be started, not ended
-router.post('/start', requireAuth(), submissionLimiter, validateContest({ checkStarted: true, checkEnded: true, checkAttemptStatus: 'NotCompleted' }), startTest);
+router.post('/start', requireAuth(), validateContest({ checkStarted: true, checkEnded: true, checkAttemptStatus: 'NotCompleted' }), startTest);
 
 // Get Test Data - Must be started and not completed
 router.get('/:id/data', requireAuth(), validateContest({ checkStarted: true, checkEnded: true, checkAttemptStatus: 'NotCompleted' }), getContestData);

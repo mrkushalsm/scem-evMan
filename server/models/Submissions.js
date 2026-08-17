@@ -72,6 +72,10 @@ const submissionSchema = new mongoose.Schema({
       type: Date,
       default: Date.now,
     },
+    // The graded fields above are the best attempt; these are the most recent one.
+    lastCode: String,
+    lastLanguage: String,
+    lastSubmittedAt: Date,
   }],
 }, { timestamps: true });
 

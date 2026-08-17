@@ -46,6 +46,13 @@ export default function TestCasePanel({
       if (data.success) {
         setResults(data.results || []);
         setScore(action === "submit" && typeof data.score === "number" ? data.score : null);
+      } else if (data.systemFault) {
+        toast.error("Execution engine unavailable", {
+          description:
+            action === "submit"
+              ? "Nothing was submitted and your previous result is unchanged. Try again in a moment."
+              : "Could not run your code. Try again in a moment.",
+        });
       } else {
         toast.error(
           data.error || data.message || `Failed to ${action === "run" ? "run" : "submit"} code`

@@ -29,7 +29,7 @@ const removeTrailingLineCommands = (output) => {
 const CITRON_TIMEOUT_MS = 60000;
 
 // Citron returns 503 when busy instead of queueing, so that's worth a retry.
-const CITRON_RETRY_DELAYS_MS = [500, 1500];
+const CITRON_RETRY_DELAYS_MS = [500, 1500, 3000];
 
 const decodeBase64 = (value) => (value ? Buffer.from(value, "base64").toString("utf-8") : "");
 
@@ -94,11 +94,13 @@ const postSubmission = async (payload) => {
 // Runs every test case of one submission in a single citron request.
 const executeTestCases = async ({ question, code, language, testCases, languageId, onProgress }) => {
     // One entry per test case even on early failure, so scoring/client counts stay in sync.
+    // systemFault means "we could not run the code" — callers must not grade or persist it.
     const failAllRaw = (status, error) => testCases.map((tc, index) => ({
         testCase: index + 1,
         passed: false,
         status,
         error,
+        systemFault: true,
         isVisible: tc.isVisible === true,
     }));
 
@@ -118,6 +120,7 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
         passed: false,
         status,
         error,
+        systemFault: true,
         isVisible: tc.isVisible,
     }));
 
@@ -148,7 +151,8 @@ const executeTestCases = async ({ question, code, language, testCases, languageI
         });
     } catch (err) {
         if (err.name === "TimeoutError") {
-            return failAll("Time Limit Exceeded", "The execution engine did not respond in time");
+            // The engine not answering is not the candidate's program hitting its CPU limit.
+            return failAll("System Error", "The execution engine did not respond in time");
         }
         if (err.citronStatus === 503) {
             return failAll("System Error", "The execution engine is busy. Please try again in a moment.");
@@ -278,37 +282,58 @@ const scoreResults = (question, results) => {
     return { passedCount, totalCount, score, overallStatus, executionTime, memoryUsed };
 };
 
-// Persists one question's entry atomically, avoiding a read-then-write race between concurrent submissions.
-const saveSubmissionEntry = async (contestId, userId, questionId, entry) => {
-    const updateExisting = () => Submission.findOneAndUpdate(
-        { contest: contestId, user: userId, "submissions.question": questionId },
+// Persists one question's entry atomically, avoiding a read-then-write race.
+// keepBest (coding): graded fields are replaced only by an equal or better attempt, so a
+// resubmit can't cost marks; last* keeps the most recent code. Default (MCQ): last wins.
+const saveSubmissionEntry = async (contestId, userId, questionId, entry, { keepBest = false } = {}) => {
+    const match = keepBest
+        ? { contest: contestId, user: userId, submissions: { $elemMatch: { question: questionId, score: { $lte: entry.score || 0 } } } }
+        : { contest: contestId, user: userId, "submissions.question": questionId };
+
+    const replaceEntry = () => Submission.findOneAndUpdate(
+        match,
         { $set: { "submissions.$": entry } },
         { returnDocument: "after", runValidators: true }
     );
 
-    let doc = await updateExisting();
+    const recordLatestOnly = () => Submission.findOneAndUpdate(
+        { contest: contestId, user: userId, "submissions.question": questionId },
+        {
+            $set: {
+                "submissions.$.lastCode": entry.code,
+                "submissions.$.lastLanguage": entry.language,
+                "submissions.$.lastSubmittedAt": entry.submittedAt || new Date(),
+            },
+        },
+        { returnDocument: "after", runValidators: true }
+    );
+
+    const appendEntry = (options = {}) => Submission.findOneAndUpdate(
+        { contest: contestId, user: userId },
+        { $push: { submissions: entry } },
+        { returnDocument: "after", runValidators: true, ...options }
+    );
+
+    let doc = await replaceEntry();
+
+    if (!doc && keepBest) doc = await recordLatestOnly();
 
     if (!doc) {
         try {
-            doc = await Submission.findOneAndUpdate(
-                { contest: contestId, user: userId },
-                { $push: { submissions: entry } },
-                { returnDocument: "after", upsert: true, runValidators: true }
-            );
+            doc = await appendEntry({ upsert: true });
         } catch (err) {
             if (err.code !== 11000) throw err;
-            // Lost the create race — retry as an update (or append) now that the doc exists.
-            doc = await updateExisting() || await Submission.findOneAndUpdate(
-                { contest: contestId, user: userId },
-                { $push: { submissions: entry } },
-                { returnDocument: "after", runValidators: true }
-            );
+            // Lost the create race — retry now that the doc exists.
+            doc = (await replaceEntry()) || (keepBest && await recordLatestOnly()) || (await appendEntry());
         }
     }
 
-    // ponytail: totalScore write can still race across different-question submits; self-heals next submit.
-    const totalScore = doc.submissions.reduce((acc, s) => acc + (s.score || 0), 0);
-    await Submission.updateOne({ _id: doc._id }, { $set: { totalScore } });
+    // Recomputed server-side so concurrent submissions can't clobber each other.
+    await Submission.updateOne(
+        { _id: doc._id },
+        [{ $set: { totalScore: { $sum: "$submissions.score" } } }],
+        { updatePipeline: true }
+    );
 };
 
 // @desc    Run code against visible test cases only
@@ -436,6 +461,16 @@ const submitCode = async (req, res, next) => {
             testCases: allTestCases,
             disclosure: DISCLOSURE.SUMMARY,
             buildDone: async (results) => {
+                // Grading an engine failure would write a 0 over a stored pass.
+                if (results.some((r) => r.systemFault)) {
+                    return {
+                        results,
+                        success: false,
+                        systemFault: true,
+                        error: results[0]?.error || "The execution engine is unavailable",
+                    };
+                }
+
                 const { score, overallStatus, executionTime, memoryUsed } = scoreResults(question, results);
 
                 await saveSubmissionEntry(contestId, userId, questionId, {
@@ -447,8 +482,11 @@ const submitCode = async (req, res, next) => {
                     testCaseResults: results,
                     executionTime,
                     memoryUsed,
-                    submittedAt: new Date()
-                });
+                    submittedAt: new Date(),
+                    lastCode: code,
+                    lastLanguage: language,
+                    lastSubmittedAt: new Date()
+                }, { keepBest: true });
 
                 return { results, score, overallStatus };
             }
@@ -517,24 +555,8 @@ const saveMCQ = async (req, res, next) => {
             submittedAt: new Date()
         };
 
-        const existingSubmission = await Submission.findOne({ contest: contestId, user: userId });
-        if (!existingSubmission) {
-            await Submission.create({
-                contest: contestId,
-                user: userId,
-                submissions: [entry],
-                totalScore: score || 0
-            });
-        } else {
-            const existingIdx = existingSubmission.submissions.findIndex(s => s.question.toString() === questionId);
-            const updatedSubmissions = existingIdx > -1
-                ? existingSubmission.submissions.map((s, i) => i === existingIdx ? entry : s)
-                : [...existingSubmission.submissions, entry];
-            const totalScore = updatedSubmissions.reduce((acc, curr) => acc + (curr.score || 0), 0);
-            await Submission.findByIdAndUpdate(existingSubmission._id, {
-                $set: { submissions: updatedSubmissions, totalScore }
-            });
-        }
+        // Auto-saves overlap, so this must not rewrite the whole submissions array.
+        await saveSubmissionEntry(contestId, userId, questionId, entry);
 
         return res.status(200).json({ success: true, score });
     } catch (error) {
@@ -543,4 +565,4 @@ const saveMCQ = async (req, res, next) => {
 };
 
 // executeTestCases is exported to exercise the execution path without Express/Mongo/auth.
-module.exports = { saveMCQ, submitCode, runCode, executeTestCases, streamExecution, scoreResults, projectResults, DISCLOSURE, MAX_CODE_LENGTH };
+module.exports = { saveMCQ, submitCode, runCode, executeTestCases, saveSubmissionEntry, streamExecution, scoreResults, projectResults, DISCLOSURE, MAX_CODE_LENGTH };

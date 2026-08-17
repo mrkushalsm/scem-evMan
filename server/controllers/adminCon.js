@@ -253,9 +253,28 @@ const deleteQuestion = async (req, res, next) => {
         await connectDB();
         const { id } = req.params;
 
+        const usedBy = await Contest.find({ questions: id }).select('title startTime endTime status');
+        const now = new Date();
+        const live = usedBy.filter((contest) => {
+            const status = (contest.status || '').toLowerCase();
+            const manuallyEnded = status === 'completed' || status === 'ended';
+            return !manuallyEnded && now >= new Date(contest.startTime) && now <= new Date(contest.endTime);
+        });
+
+        // Removing a problem mid-sitting shifts every candidate's question list and score.
+        if (live.length > 0) {
+            return res.status(409).json({
+                success: false,
+                error: `This question is in progress in: ${live.map((c) => c.title).join(', ')}. End those contests before deleting it.`
+            });
+        }
+
         const question = await Question.findByIdAndDelete(id);
 
         if (!question) return res.status(404).json({ success: false, error: 'Question not found' });
+
+        // Otherwise contests keep a dangling id and silently serve fewer problems.
+        await Contest.updateMany({ questions: id }, { $pull: { questions: id } });
 
         res.status(200).json({ success: true, message: 'Question deleted successfully' });
     } catch (error) {

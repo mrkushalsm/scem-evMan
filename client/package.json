@@ -7,7 +7,8 @@
     "start": "next start",
     "lint": "next lint",
     "check": "tsc --noEmit",
-    "clean": "rm -rf .next node_modules"
+    "clean": "rm -rf .next node_modules",
+    "test": "tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -64,6 +65,7 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.23.12",
     "tw-animate-css": "^1.4.0",
     "typescript": "^6.0.3"
   }

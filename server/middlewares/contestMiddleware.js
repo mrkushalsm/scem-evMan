@@ -54,6 +54,12 @@ const validateContest = (options = {}) => async (req, res, next) => {
             // shared join-window endTime, so a late starter isn't cut off
             // early. No submission yet (or already Completed) falls back to
             // the join-window cutoff.
+            //
+            // Deliberately NOT capped at endTime: someone who starts just before the
+            // join window closes still gets their full duration, which means an attempt
+            // can legitimately run past the contest's advertised end. This is the chosen
+            // policy — don't "fix" it into min(startedAt + duration, endTime) without
+            // deciding that late joiners should get a shortened attempt instead.
             const activeSubmission = submission && submission.status !== 'Completed' ? submission : null;
             const deadline = activeSubmission
                 ? new Date(activeSubmission.startedAt.getTime() + (contest.durationMinutes || 0) * 60000)

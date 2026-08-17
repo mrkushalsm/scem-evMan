@@ -13,6 +13,7 @@ export interface ExecutionResult {
   passedCount?: number;
   totalCount?: number;
   rateLimited?: boolean;
+  systemFault?: boolean;
   error?: string;
   message?: string;
 }
