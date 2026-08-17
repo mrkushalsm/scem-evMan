@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { useTestCompletion } from "./use-test-completion";
 import { getBaseUrl } from "@/lib/env";
 import { getContestData } from "@/actions/contest";
+import { toast } from "@/components/ui/banner";
 import { readViolationCount, MAX_VIOLATIONS } from "@/lib/attempt-integrity";
 import TestTimer from "./test-timer";
 
@@ -56,14 +57,17 @@ export default function TestHeader({ problems, initialTimeRemaining }: TestHeade
     return () => window.removeEventListener("pageshow", onPageShow);
   }, [router]);
 
-  // Client-side verification on mount to handle back navigation / stale cache
+  // Verify on mount (handles back navigation / stale cache) and keep polling
+  // while the tab stays open — an admin can force-end the contest at any
+  // point during an active attempt, and only a live check catches that.
   React.useEffect(() => {
     const verifyStatus = async () => {
       if (!params.testid) return;
       try {
         const data = await getContestData(params.testid as string);
         // If server says completed or prohibited, kick them out
-        if (!data.success || (data.data?.isCompleted)) {
+        if (!data.success || data.isCompleted || data.data?.isCompleted) {
+          toast.error("This test has ended", { description: "Your submission has already been recorded." });
           router.replace(`/test/${params.testid}`);
         }
       } catch {
@@ -71,6 +75,8 @@ export default function TestHeader({ problems, initialTimeRemaining }: TestHeade
       }
     };
     verifyStatus();
+    const interval = setInterval(verifyStatus, 20000);
+    return () => clearInterval(interval);
   }, [params.testid, router]);
 
   const handleFinish = async () => {

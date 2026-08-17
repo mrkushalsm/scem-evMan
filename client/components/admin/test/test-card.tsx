@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -11,16 +9,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Loader2, Trash2 } from "lucide-react";
+import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Test } from "@/types/test";
 import { getTestStatusBadgeVariant, getTestStatusLabel } from "@/lib/test-status";
 
-import { deleteTestAction } from "@/actions/delete-test";
-
 export function TestCard({ test }: { test: Test }) {
-  const router = useRouter();
-  const [isDeleting, setIsDeleting] = useState(false);
   const statusLabel = getTestStatusLabel(test.status);
   const statusVariant = getTestStatusBadgeVariant(test.status);
 
@@ -151,45 +145,6 @@ export function TestCard({ test }: { test: Test }) {
               </Button>
             )}
           </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
-            disabled={test.status === "ongoing" || isDeleting}
-            title={test.status === "ongoing" ? "Cannot delete active test" : "Delete Test"}
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (confirm("Are you sure you want to delete this test?")) {
-                setIsDeleting(true);
-
-                try {
-                  const json = await deleteTestAction(test.id as string);
-
-                  if (!json.success) {
-                    throw new Error(json.message || "Failed to delete test");
-                  }
-
-                  router.refresh();
-                } catch (error) {
-                  alert(
-                    error instanceof Error
-                      ? error.message
-                      : "Failed to delete test",
-                  );
-                } finally {
-                  setIsDeleting(false);
-                }
-              }
-            }}
-          >
-            {isDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
         </div>
       </CardContent>
     </Card>

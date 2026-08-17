@@ -65,7 +65,11 @@ const validateContest = (options = {}) => async (req, res, next) => {
                 ? new Date(activeSubmission.startedAt.getTime() + (contest.durationMinutes || 0) * 60000)
                 : endTime;
 
-            if (isManuallyEnded || now > deadline) {
+            // A manual "End Test" blocks new/not-yet-started attempts but lets someone
+            // already mid-attempt keep going until their own deadline — that's the
+            // whole point of a "soft" end vs. force-ending (which completes every
+            // Ongoing submission up front, so activeSubmission is null afterward).
+            if ((isManuallyEnded && !activeSubmission) || now > deadline) {
                 return res.status(403).json({ success: false, error: 'Contest has ended' });
             }
         }

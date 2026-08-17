@@ -12,6 +12,8 @@ const {
   createContest,
   cloneContest,
   updateContest,
+  endContest,
+  forceEndContest,
   getAdminContestResults,
   deleteContest,
   getAdminStats,
@@ -62,6 +64,8 @@ router.get("/tests/:id", requireAuth(), isAdmin, getAdminContestDetail);
 router.post("/tests/create", requireAuth(), isAdmin, createContest);
 router.post("/tests/:id/clone", requireAuth(), isAdmin, cloneContest);
 router.put("/tests/:id/edit", requireAuth(), isAdmin, updateContest);
+router.post("/tests/:id/end", requireAuth(), isAdmin, endContest);
+router.post("/tests/:id/force-end", requireAuth(), isAdmin, forceEndContest);
 router.delete("/tests/:id", requireAuth(), isAdmin, deleteContest);
 router.get("/tests/:id/result", requireAuth(), isAdmin, getAdminContestResults);
 router.get("/tests/:id/export/scores", requireAuth(), isAdmin, exportScores);

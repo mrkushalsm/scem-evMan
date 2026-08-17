@@ -289,7 +289,7 @@ const getAdminContests = async (req, res, next) => {
     try {
         await connectDB();
         // Return summary fields
-        const contests = await Contest.find().select('title description createdAt questions author startTime endTime durationMinutes joinId');
+        const contests = await Contest.find().select('title description createdAt questions author startTime endTime durationMinutes joinId status');
         const now = new Date();
 
         // One grouped query instead of one Submission.find() per contest.
@@ -324,12 +324,14 @@ const getAdminContests = async (req, res, next) => {
             const { total = 0, completed = 0 } = countsByContest[c._id.toString()] || {};
             const ongoing = total - completed;
 
-            // Compute Status Dynamically (Pure Time-Based)
+            // Compute Status Dynamically, unless manually ended/completed via the admin panel
             let computedStatus = 'waiting';
-            // Only override if it's not manually ended/completed
-            const isManuallyEnded = false; // Status field removed, relying on time only
+            const contestStatus = (c.status || '').toLowerCase();
+            const isManuallyEnded = contestStatus === 'completed' || contestStatus === 'ended';
 
-            if (!isManuallyEnded) {
+            if (isManuallyEnded) {
+                computedStatus = 'completed';
+            } else {
                 if (now > end) {
                     computedStatus = 'completed';
                 } else if (now >= start && now <= end) {
@@ -549,6 +551,48 @@ const updateContest = async (req, res, next) => {
         if (!contest) return res.status(404).json({ success: false, error: 'Contest not found' });
 
         res.status(200).json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc End a contest: blocks new joins/starts, lets in-progress candidates finish
+const endContest = async (req, res, next) => {
+    try {
+        await connectDB();
+        const { id } = req.params;
+
+        const contest = await Contest.findByIdAndUpdate(id, { status: 'ended' }, { returnDocument: 'after' });
+        if (!contest) return res.status(404).json({ success: false, error: 'Contest not found' });
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc Force-end a contest: also immediately submits every in-progress candidate
+const forceEndContest = async (req, res, next) => {
+    try {
+        await connectDB();
+        const { id } = req.params;
+
+        const contest = await Contest.findByIdAndUpdate(id, { status: 'ended' }, { returnDocument: 'after' });
+        if (!contest) return res.status(404).json({ success: false, error: 'Contest not found' });
+
+        const { modifiedCount } = await Submission.updateMany(
+            { contest: id, status: 'Ongoing' },
+            {
+                $set: {
+                    status: 'Completed',
+                    submittedAt: new Date(),
+                    forcedSubmission: true,
+                    autoSubmitReason: 'CONTEST_FORCE_ENDED',
+                },
+            }
+        );
+
+        res.status(200).json({ success: true, submittedCount: modifiedCount });
     } catch (error) {
         next(error);
     }
@@ -829,6 +873,8 @@ module.exports = {
     createContest,
     cloneContest,
     updateContest,
+    endContest,
+    forceEndContest,
     getAdminContestResults,
     deleteQuestion,
     deleteContest,
