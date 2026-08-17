@@ -7,10 +7,10 @@ import { useRouter } from "next/navigation";
 import { QuestionSchema, questionSchema } from "@/types/problem";
 import { saveQuestion } from "@/actions/save-question";
 
+import { toast } from "@/components/ui/banner";
 import { Form } from "@/components/ui/form";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Save, ArrowLeft, Eye, AlertCircle } from "lucide-react";
+import { Save, ArrowLeft, Eye } from "lucide-react";
 import Link from "next/link";
 import BasicInfoCard from "./shared/info-card";
 import MCQCard from "./mcq/mcq-card";
@@ -123,13 +123,14 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
 
   const [isPending, startTransition] = useTransition();
 
-  const fieldErrors = [...new Set(collectMessages(form.formState.errors))];
-
   useEffect(() => {
     if (state.success) {
+      toast.success(state.message || "Question saved");
       router.push("/admin/questions");
+    } else if (state.message) {
+      toast.error("Saving failed", { description: state.message });
     }
-  }, [state.success, router]);
+  }, [state, router]);
 
   const handleSubmit = form.handleSubmit((data) => {
     const submissionData = { ...data };
@@ -156,6 +157,13 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
         formAction(submissionData);
       });
     }
+  }, (errors) => {
+    // Field errors also render inline, but a test case sits far down a long form,
+    // so the toast is what tells the author anything went wrong at all.
+    const messages = [...new Set(collectMessages(errors))];
+    toast.error("This question can’t be saved yet", {
+      description: messages.length > 0 ? messages.join(" · ") : "Some fields need attention.",
+    });
   });
 
   return (
@@ -219,25 +227,6 @@ export default function QuestionForm({ type, isCreating, initialData }: Props) {
         <form id="question-form" onSubmit={handleSubmit} className="space-y-6">
           <input type="hidden" {...form.register("type")} value={type} />
 
-          {(fieldErrors.length > 0 || (!state.success && state.message)) && (
-            <Alert variant="destructive">
-              <AlertCircle />
-              <AlertTitle>
-                {fieldErrors.length > 0 ? "This question can’t be saved yet" : "Saving failed"}
-              </AlertTitle>
-              <AlertDescription>
-                {fieldErrors.length > 0 ? (
-                  <ul className="list-disc pl-4 space-y-0.5">
-                    {fieldErrors.map((message) => (
-                      <li key={message}>{message}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  state.message
-                )}
-              </AlertDescription>
-            </Alert>
-          )}
 
           {type === "coding" ? (
             <div className="space-y-6">

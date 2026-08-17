@@ -94,7 +94,7 @@ export default function TestHeader({ problems, initialTimeRemaining }: TestHeade
   const mcqProblems = problems.filter((p) => !isCoding(p));
 
   return (
-    <div className="flex items-center justify-center p-2 select-none h-12 absolute top-0 w-screen bg-primary">
+    <div className="flex items-center justify-center p-2 select-none h-12 absolute top-[var(--banner-h,0px)] w-screen bg-primary">
       <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 shrink-0">
         <TestTimer initialSecondsRemaining={initialTimeRemaining} />
         <div

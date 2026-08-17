@@ -11,7 +11,7 @@ import { FaCheckCircle } from "react-icons/fa";
 import { MdEmail } from "react-icons/md";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/banner";
 import { Eye, EyeOff } from "lucide-react";
 import { register } from "@/actions/auth";
 
@@ -120,7 +120,7 @@ function RegisterForm() {
 
   return (
     <main className="h-screen flex items-center justify-center p-0">
-      <div className="absolute top-0 left-0 w-full h-1/3 z-15">
+      <div className="absolute top-[var(--banner-h,0px)] left-0 w-full h-1/3 z-15">
         <svg
           viewBox="0 0 24 10"
           xmlns="http://www.w3.org/2000/svg"

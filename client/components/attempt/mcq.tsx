@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Problem, MCQProblem } from "@/types/problem";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/banner";
 
 import { useAttemptRuntime } from "./attempt-runtime";
 

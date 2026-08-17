@@ -37,7 +37,7 @@ export default function AdminSidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col items-center w-14 min-w-14 py-6 space-y-6 bg-sidebar border-r border-border sticky top-12 h-[calc(100vh-3rem)]">
+      <aside className="hidden md:flex flex-col items-center w-14 min-w-14 py-6 space-y-6 bg-sidebar border-r border-border sticky top-[calc(3rem+var(--banner-h,0px))] h-[calc(100dvh-3rem-var(--banner-h,0px))]">
         {routes.map((r) => {
           const isActive = r.exact
             ? pathname === r.link

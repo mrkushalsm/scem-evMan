@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/banner";
 import {
   AUTO_SUBMIT_REASON,
   clearAttemptIntegrityState,

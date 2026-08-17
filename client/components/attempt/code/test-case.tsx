@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CodeXml, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
-import { toast } from "sonner";
+import { toast } from "@/components/ui/banner";
 import { CodingProblem } from "@/types/problem";
 import { useAttemptRuntime, TestCaseResult } from "../attempt-runtime";
 

@@ -8,7 +8,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/banner";
 
 
 import { joinTest } from "@/actions/contest";

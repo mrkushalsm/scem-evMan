@@ -148,3 +148,14 @@
     }
   }
 }
+/* The app banner takes real space at the top of the viewport, so "a screen" means
+   the viewport minus that bar. Redefining these two keeps every existing h-screen /
+   min-h-screen page correct instead of touching each one. Deliberately unlayered:
+   Tailwind emits its utilities inside @layer utilities, and unlayered rules win. */
+.h-screen {
+  height: calc(100dvh - var(--banner-h, 0px));
+}
+
+.min-h-screen {
+  min-height: calc(100dvh - var(--banner-h, 0px));
+}

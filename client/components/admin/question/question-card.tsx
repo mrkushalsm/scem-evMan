@@ -2,12 +2,14 @@
 // forcing revalidation
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Code, HelpCircle, Pencil, Trash2, Download } from "lucide-react";
+import { Code, HelpCircle, Pencil, Trash2, Download, Eye } from "lucide-react";
 import { BaseProblem } from "@/types/problem/problem.types";
 import React from "react";
 import Link from "next/link";
+import { toast } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { deleteQuestion } from "@/actions/delete-question";
+import { exportQuestion } from "@/actions/export-question";
 
 interface Props {
   problem: BaseProblem;
@@ -56,30 +58,26 @@ export default function QuestionCard({
 
   const handleExport = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      const response = await fetch(
-        `/api/admin/questions/${problem._id || problem.id}/export`,
-        {
-          method: "GET",
-        }
-      );
 
-      if (!response.ok) {
-        throw new Error("Failed to export question");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `question-${problem.title?.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      alert("Failed to export question");
+    const result = await exportQuestion(String(problem._id || problem.id));
+    if (!result.success) {
+      toast.error("Export failed", { description: result.message });
+      return;
     }
+
+    const blob = new Blob([JSON.stringify(result.payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `question-${problem.title?.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast.success("Question exported");
   };
 
   return (
@@ -123,8 +121,18 @@ export default function QuestionCard({
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
             <Link
+              href={`/admin/questions/${(problem.type || "coding").toLowerCase()}/${problem._id || problem.id}/preview`}
+              onClick={(e) => e.stopPropagation()}
+              title="Preview in the candidate UI"
+            >
+              <Eye className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
+            <Link
               href={`/admin/questions/${(problem.type || "coding").toLowerCase()}/${problem._id || problem.id}/edit`}
               onClick={(e) => e.stopPropagation()}
+              title="Edit"
             >
               <Pencil className="h-4 w-4" />
             </Link>
@@ -138,8 +146,10 @@ export default function QuestionCard({
               e.preventDefault();
               if (confirm("Are you sure you want to delete this question?")) {
                 const res = await deleteQuestion(String(problem._id || problem.id));
-                if (!res.success) {
-                  alert(res.error || "Failed to delete question");
+                if (res.success) {
+                  toast.success("Question deleted");
+                } else {
+                  toast.error("Delete failed", { description: res.error || "Failed to delete question" });
                 }
               }
             }}

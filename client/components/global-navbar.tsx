@@ -24,7 +24,7 @@ export default function Navbar() {
   if (!showNavbar) return null;
 
   return (
-    <header className="absolute top-0 z-10 w-full">
+    <header className="absolute top-[var(--banner-h,0px)] z-10 w-full">
       <nav className="bg-background-navbar h-12 flex items-center justify-between px-6 shadow-md">
         {/* Logo/Brand */}
         <div className="flex items-center">

@@ -33,7 +33,7 @@ export default async function QuestionPreviewPage({
   if (problem.type !== type) return notFound();
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed inset-x-0 bottom-0 top-[var(--banner-h,0px)] z-50 flex flex-col bg-background">
       <div className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link href={`/admin/questions/${type}/${id}/edit`}>

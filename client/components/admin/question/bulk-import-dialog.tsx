@@ -277,7 +277,7 @@ export default function BulkImportDialog({
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex flex-col bg-background">
+    <div className="fixed inset-x-0 bottom-0 top-[var(--banner-h,0px)] z-[100] flex flex-col bg-background">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b px-6 py-4 lg:px-10">
         <div className="flex items-center gap-2.5">

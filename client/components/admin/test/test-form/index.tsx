@@ -14,7 +14,7 @@ import { ArrowLeft, Save } from "lucide-react";
 import { useActionState, useTransition, useEffect } from "react";
 import TestQuestions from "../questions-list";
 import { saveTest } from "@/actions/save-test";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/banner";
 import { formatTimeForDisplay } from "@/lib/date-utils";
 
 import { Problem } from "@/types/problem";

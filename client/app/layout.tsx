@@ -3,7 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import Navbar from "@/components/global-navbar";
 import { SessionProvider } from "@/components/session-provider";
-import { Toaster } from "sonner";
+import { AppBanner } from "@/components/ui/banner";
 
 const domain = process.env.DOMAIN || "localhost:3000";
 const protocol = process.env.PROTOCOL || "http";
@@ -57,7 +57,7 @@ export default function RootLayout({
   return (
     <SessionProvider>
       <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
-        <body className="antialiased h-screen overflow-hidden">
+        <body className="antialiased h-[100dvh] overflow-hidden box-border pt-[var(--banner-h,0px)]">
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -65,7 +65,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <Navbar />
-            <Toaster position="top-center" expand />
+            <AppBanner />
 
             {children}
           </ThemeProvider>
