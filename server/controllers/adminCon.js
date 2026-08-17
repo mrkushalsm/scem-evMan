@@ -2,7 +2,7 @@ const Question = require('../models/Question');
 const Contest = require('../models/Contest');
 const Submission = require('../models/Submissions');
 const { connectDB } = require('../helpers/dbCon');
-const { getJudge } = require("@pomelo/code-gen");
+const { getJudge, validateProblemConfig } = require("@pomelo/code-gen");
 const {
   exportSingleQuestion,
   exportBulkQuestions,
@@ -54,11 +54,12 @@ const createProblem = async (req, res, next) => {
         const safeTestcases = asArray(testcases);
 
         if (isCoding) {
-            if (!isNonEmptyString(functionName)) {
-                return res.status(400).json({ success: false, error: 'Function name is required for coding questions' });
-            }
             if (!Array.isArray(inputVariables)) {
                 return res.status(400).json({ success: false, error: 'Input variables must be an array' });
+            }
+            const signatureErrors = validateProblemConfig({ method: functionName, input: safeInputVariables });
+            if (signatureErrors.length > 0) {
+                return res.status(400).json({ success: false, error: signatureErrors.join('; ') });
             }
         }
 
@@ -163,6 +164,13 @@ const updateProblem = async (req, res, next) => {
 
         if (isCoding && inputVariables !== undefined && !Array.isArray(inputVariables)) {
             return res.status(400).json({ success: false, error: 'Input variables must be an array' });
+        }
+
+        if (isCoding && (functionName !== undefined || inputVariables !== undefined)) {
+            const signatureErrors = validateProblemConfig({ method: functionName, input: safeInputVariables });
+            if (signatureErrors.length > 0) {
+                return res.status(400).json({ success: false, error: signatureErrors.join('; ') });
+            }
         }
 
         if (isMcq && options !== undefined && (!Array.isArray(options) || safeOptions.length < 2)) {

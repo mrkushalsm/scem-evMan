@@ -7,29 +7,53 @@
       "reader": "scanf(\"%d\", &{var});",
       "hint": "int"
     },
+    "long": {
+      "reader": "scanf(\"%lld\", &{var});",
+      "hint": "long long"
+    },
     "float": {
       "reader": "scanf(\"%f\", &{var});",
       "hint": "float"
+    },
+    "double": {
+      "reader": "scanf(\"%lf\", &{var});",
+      "hint": "double"
+    },
+    "bool": {
+      "reader": "scanf(\"%d\", &{var});",
+      "hint": "int"
     },
     "char": {
       "reader": "scanf(\" %c\", &{var});",
       "hint": "char"
     },
     "string": {
-      "reader": "{var} = (char*)malloc(256); scanf(\"%s\", {var});",
+      "reader": "{var} = (char*)malloc(256); scanf(\"%255s\", {var});",
       "hint": "char*"
     },
     "int_array": {
-      "reader": "scanf(\"%d\", &{var}_size); for(int i=0; i<{var}_size; i++) { scanf(\"%d\", &{var}[i]); }",
-      "hint": "int*"
+      "reader": "int {var}_size; scanf(\"%d\", &{var}_size); int* {var} = (int*)malloc(sizeof(int) * ({var}_size > 0 ? {var}_size : 1)); for (int i = 0; i < {var}_size; i++) { scanf(\"%d\", &{var}[i]); }",
+      "hint": "int*",
+      "sizeParams": ["{var}_size"],
+      "selfDeclaring": true
     },
     "float_array": {
-      "reader": "scanf(\"%d\", &{var}_size); for(int i=0; i<{var}_size; i++) { scanf(\"%f\", &{var}[i]); }",
-      "hint": "float*"
+      "reader": "int {var}_size; scanf(\"%d\", &{var}_size); float* {var} = (float*)malloc(sizeof(float) * ({var}_size > 0 ? {var}_size : 1)); for (int i = 0; i < {var}_size; i++) { scanf(\"%f\", &{var}[i]); }",
+      "hint": "float*",
+      "sizeParams": ["{var}_size"],
+      "selfDeclaring": true
     },
     "string_array": {
-      "reader": "scanf(\"%d\", &{var}_size); for(int i=0; i<{var}_size; i++) { {var}[i] = (char*)malloc(256); scanf(\"%s\", {var}[i]); }",
-      "hint": "char**"
+      "reader": "int {var}_size; scanf(\"%d\", &{var}_size); char** {var} = (char**)malloc(sizeof(char*) * ({var}_size > 0 ? {var}_size : 1)); for (int i = 0; i < {var}_size; i++) { {var}[i] = (char*)malloc(256); scanf(\"%255s\", {var}[i]); }",
+      "hint": "char**",
+      "sizeParams": ["{var}_size"],
+      "selfDeclaring": true
+    },
+    "int_matrix": {
+      "reader": "int {var}_rows, {var}_cols; scanf(\"%d %d\", &{var}_rows, &{var}_cols); int** {var} = (int**)malloc(sizeof(int*) * ({var}_rows > 0 ? {var}_rows : 1)); for (int i = 0; i < {var}_rows; i++) { {var}[i] = (int*)malloc(sizeof(int) * ({var}_cols > 0 ? {var}_cols : 1)); for (int j = 0; j < {var}_cols; j++) { scanf(\"%d\", &{var}[i][j]); } }",
+      "hint": "int**",
+      "sizeParams": ["{var}_rows", "{var}_cols"],
+      "selfDeclaring": true
     }
   }
 }

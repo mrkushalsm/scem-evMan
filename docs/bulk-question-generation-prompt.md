@@ -58,7 +58,7 @@ either `"coding"` or `"mcq"`, with the fields below.
   "outputFormat": "string — describes what's printed to stdout, see §6",
   "functionName": "string — camelCase, e.g. twoSum",
   "inputVariables": [
-    { "variable": "string", "type": "int" | "float" | "char" | "string" | "int_array" | "float_array" | "string_array" }
+    { "variable": "string", "type": "int" | "long" | "float" | "double" | "bool" | "char" | "string" | "int_array" | "float_array" | "string_array" | "int_matrix" }
   ],
   "testcases": [
     { "input": "string", "output": "string", "isVisible": true, "explanation": "string (optional, required when isVisible is true)" }
@@ -98,7 +98,7 @@ otherwise).
   "difficulty": "Easy",
   "constraints": "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\nOnly one valid answer exists.",
   "inputFormat": "The function receives nums (a list of integers) and target (an integer).",
-  "outputFormat": "Return two space-separated integers: the indices of the two numbers that add up to target, in ascending order.",
+  "outputFormat": "Print two space-separated integers: the indices of the two numbers that add up to target, in ascending order.",
   "functionName": "twoSum",
   "inputVariables": [
     { "variable": "nums", "type": "int_array" },
@@ -162,11 +162,15 @@ each test case into raw **stdin**, and compares raw **stdout**. Both fields
 must be written as flat, whitespace-separated strings, positionally
 matching `inputVariables` in the order they're declared:
 
-- Scalar types (`int`, `float`, `char`, `string`) → the value itself as a
-  token (e.g. `9`).
+- Scalar types (`int`, `long`, `float`, `double`, `char`, `string`) → the
+  value itself as a token (e.g. `9`).
+- `bool` → `1` or `0`.
 - Array types (`int_array`, `float_array`, `string_array`) → the array's
   **length**, followed by its elements, all space-separated (e.g. the array
   `[2, 7, 11, 15]` becomes `4 2 7 11 15`).
+- Matrix types (`int_matrix`) → **rows**, then **columns**, then the
+  elements in row-major order (e.g. `[[1, 2], [3, 4]]` becomes
+  `2 2 1 2 3 4`). Every row must have the same length.
 - Multiple variables are concatenated left-to-right, space-separated.
 
 `output` follows the same flattening rule for whatever the program prints.
@@ -184,20 +188,21 @@ def twoSum(nums, target):
     # write your code here
 ```
 
-The harness then prints whatever the function **returns**. So the two
-human-facing format fields describe two different halves of this pipeline:
+The generated function returns `void` and the harness does **not** print
+anything for the learner — the learner's own function must print the answer
+to stdout. So the two human-facing format fields describe two different
+halves of this pipeline:
 
 - **`inputFormat`** describes the **function's parameters** — their names,
   types, and meaning — matching `inputVariables`, e.g. "The function
   receives `nums` (a list of integers) and `target` (an integer)." Do
   **not** describe it as a stdin-parsing task (e.g. "First line contains
   n and target...") — the learner never reads stdin themselves.
-- **`outputFormat`** describes **what ends up on stdout** (the harness
-  prints the function's return value for you), e.g. "Return two
-  space-separated integers: the indices of the two numbers that add up to
-  target." Be explicit that it's printed as space-separated values, not
-  returned as a structured object — that's what the stdout comparison in
-  this section actually checks against `output`.
+- **`outputFormat`** describes **what the function must print to stdout**,
+  e.g. "Print two space-separated integers: the indices of the two numbers
+  that add up to target." Be explicit that it is printed as
+  space-separated values rather than returned — that's what the stdout
+  comparison in this section actually checks against `output`.
 
 ### 7. Supported data types
 
@@ -206,17 +211,31 @@ Only these `inputVariables[].type` values are valid for coding questions:
 | type | meaning |
 |---|---|
 | `int` | signed integer |
+| `long` | 64-bit signed integer |
 | `float` | floating point number |
+| `double` | double-precision floating point number |
+| `bool` | boolean, encoded as `1` or `0` per §6 |
 | `char` | single character |
 | `string` | text token (no embedded whitespace) |
 | `int_array` | array of integers, length-prefixed per §6 |
 | `float_array` | array of floats, length-prefixed per §6 |
 | `string_array` | array of string tokens, length-prefixed per §6 |
+| `int_matrix` | 2-D integer array, rows/cols-prefixed per §6 |
+
+`functionName` and every `inputVariables[].variable` must be a valid
+identifier (`[A-Za-z_][A-Za-z0-9_]*`), must not be a keyword in C, C++,
+Java or Python, and must not be a name the generated harness uses itself
+(`main`, `Main`, `Code`, `args`, `scanner`, `iterator`, `input_data`, `i`,
+`j`, `std`, `sys`, `cin`, `cout`, `printf`, `scanf`, `malloc`, `System`,
+`Scanner`). Names must be unique, and because C signatures gain a trailing
+length parameter for arrays and matrices, no variable may be named
+`<array>_size`, `<matrix>_rows` or `<matrix>_cols`. Questions violating any
+of these are rejected at import.
 
 ### 8. Supported languages
 
-Coding submissions are judged in **C, Java, and Python** only. Starter code
-for all three is generated automatically from `functionName` and
+Coding submissions are judged in **C, C++, Java, and Python** only. Starter
+code for all four is generated automatically from `functionName` and
 `inputVariables` — do not include language-specific boilerplate in the
 output unless explicitly asked to.
 
@@ -297,7 +316,7 @@ either `"coding"` or `"mcq"`, with the fields below.
   "outputFormat": "string — describes what's printed to stdout, see §6",
   "functionName": "string — camelCase, e.g. twoSum",
   "inputVariables": [
-    { "variable": "string", "type": "int" | "float" | "char" | "string" | "int_array" | "float_array" | "string_array" }
+    { "variable": "string", "type": "int" | "long" | "float" | "double" | "bool" | "char" | "string" | "int_array" | "float_array" | "string_array" | "int_matrix" }
   ],
   "testcases": [
     { "input": "string", "output": "string", "isVisible": true, "explanation": "string (optional, required when isVisible is true)" }
@@ -336,7 +355,7 @@ Example coding question:
   "difficulty": "Easy",
   "constraints": "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\nOnly one valid answer exists.",
   "inputFormat": "The function receives nums (a list of integers) and target (an integer).",
-  "outputFormat": "Return two space-separated integers: the indices of the two numbers that add up to target, in ascending order.",
+  "outputFormat": "Print two space-separated integers: the indices of the two numbers that add up to target, in ascending order.",
   "functionName": "twoSum",
   "inputVariables": [
     { "variable": "nums", "type": "int_array" },
@@ -398,11 +417,15 @@ each test case into raw **stdin**, and compares raw **stdout**. Both fields
 must be written as flat, whitespace-separated strings, positionally
 matching `inputVariables` in the order they're declared:
 
-- Scalar types (`int`, `float`, `char`, `string`) → the value itself as a
-  token (e.g. `9`).
+- Scalar types (`int`, `long`, `float`, `double`, `char`, `string`) → the
+  value itself as a token (e.g. `9`).
+- `bool` → `1` or `0`.
 - Array types (`int_array`, `float_array`, `string_array`) → the array's
   **length**, followed by its elements, all space-separated (e.g. the array
   `[2, 7, 11, 15]` becomes `4 2 7 11 15`).
+- Matrix types (`int_matrix`) → **rows**, then **columns**, then the
+  elements in row-major order (e.g. `[[1, 2], [3, 4]]` becomes
+  `2 2 1 2 3 4`). Every row must have the same length.
 - Multiple variables are concatenated left-to-right, space-separated.
 
 `output` follows the same flattening rule for whatever the program prints.
@@ -420,20 +443,21 @@ def twoSum(nums, target):
     # write your code here
 ```
 
-The harness then prints whatever the function **returns**. So the two
-human-facing format fields describe two different halves of this pipeline:
+The generated function returns `void` and the harness does **not** print
+anything for the learner — the learner's own function must print the answer
+to stdout. So the two human-facing format fields describe two different
+halves of this pipeline:
 
 - **`inputFormat`** describes the **function's parameters** — their names,
   types, and meaning — matching `inputVariables`, e.g. "The function
   receives `nums` (a list of integers) and `target` (an integer)." Do
   **not** describe it as a stdin-parsing task (e.g. "First line contains
   n and target...") — the learner never reads stdin themselves.
-- **`outputFormat`** describes **what ends up on stdout** (the harness
-  prints the function's return value for you), e.g. "Return two
-  space-separated integers: the indices of the two numbers that add up to
-  target." Be explicit that it's printed as space-separated values, not
-  returned as a structured object — that's what the stdout comparison in
-  this section actually checks against `output`.
+- **`outputFormat`** describes **what the function must print to stdout**,
+  e.g. "Print two space-separated integers: the indices of the two numbers
+  that add up to target." Be explicit that it is printed as
+  space-separated values rather than returned — that's what the stdout
+  comparison in this section actually checks against `output`.
 
 ### 7. Supported data types
 
@@ -442,17 +466,31 @@ Only these `inputVariables[].type` values are valid for coding questions:
 | type | meaning |
 |---|---|
 | `int` | signed integer |
+| `long` | 64-bit signed integer |
 | `float` | floating point number |
+| `double` | double-precision floating point number |
+| `bool` | boolean, encoded as `1` or `0` per §6 |
 | `char` | single character |
 | `string` | text token (no embedded whitespace) |
 | `int_array` | array of integers, length-prefixed per §6 |
 | `float_array` | array of floats, length-prefixed per §6 |
 | `string_array` | array of string tokens, length-prefixed per §6 |
+| `int_matrix` | 2-D integer array, rows/cols-prefixed per §6 |
+
+`functionName` and every `inputVariables[].variable` must be a valid
+identifier (`[A-Za-z_][A-Za-z0-9_]*`), must not be a keyword in C, C++,
+Java or Python, and must not be a name the generated harness uses itself
+(`main`, `Main`, `Code`, `args`, `scanner`, `iterator`, `input_data`, `i`,
+`j`, `std`, `sys`, `cin`, `cout`, `printf`, `scanf`, `malloc`, `System`,
+`Scanner`). Names must be unique, and because C signatures gain a trailing
+length parameter for arrays and matrices, no variable may be named
+`<array>_size`, `<matrix>_rows` or `<matrix>_cols`. Questions violating any
+of these are rejected at import.
 
 ### 8. Supported languages
 
-Coding submissions are judged in **C, Java, and Python** only. Starter code
-for all three is generated automatically from `functionName` and
+Coding submissions are judged in **C, C++, Java, and Python** only. Starter
+code for all four is generated automatically from `functionName` and
 `inputVariables` — do not include language-specific boilerplate in the
 output unless explicitly asked to.
 

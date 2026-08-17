@@ -7,9 +7,21 @@
       "reader": "scanner.nextInt()",
       "hint": "int"
     },
+    "long": {
+      "reader": "scanner.nextLong()",
+      "hint": "long"
+    },
     "float": {
       "reader": "scanner.nextFloat()",
       "hint": "float"
+    },
+    "double": {
+      "reader": "scanner.nextDouble()",
+      "hint": "double"
+    },
+    "bool": {
+      "reader": "scanner.nextInt() != 0",
+      "hint": "boolean"
     },
     "char": {
       "reader": "scanner.next().charAt(0)",
@@ -20,16 +32,24 @@
       "hint": "String"
     },
     "int_array": {
-      "reader": "int {var}_size = scanner.nextInt(); int[] {var} = new int[{var}_size]; for(int i=0; i<{var}_size; i++) { {var}[i] = scanner.nextInt(); }",
-      "hint": "int[]"
+      "reader": "int {var}_size = scanner.nextInt(); int[] {var} = new int[{var}_size]; for (int i = 0; i < {var}_size; i++) { {var}[i] = scanner.nextInt(); }",
+      "hint": "int[]",
+      "selfDeclaring": true
     },
     "float_array": {
-      "reader": "int {var}_size = scanner.nextInt(); float[] {var} = new float[{var}_size]; for(int i=0; i<{var}_size; i++) { {var}[i] = scanner.nextFloat(); }",
-      "hint": "float[]"
+      "reader": "int {var}_size = scanner.nextInt(); float[] {var} = new float[{var}_size]; for (int i = 0; i < {var}_size; i++) { {var}[i] = scanner.nextFloat(); }",
+      "hint": "float[]",
+      "selfDeclaring": true
     },
     "string_array": {
-      "reader": "int {var}_size = scanner.nextInt(); String[] {var} = new String[{var}_size]; for(int i=0; i<{var}_size; i++) { {var}[i] = scanner.next(); }",
-      "hint": "String[]"
+      "reader": "int {var}_size = scanner.nextInt(); String[] {var} = new String[{var}_size]; for (int i = 0; i < {var}_size; i++) { {var}[i] = scanner.next(); }",
+      "hint": "String[]",
+      "selfDeclaring": true
+    },
+    "int_matrix": {
+      "reader": "int {var}_rows = scanner.nextInt(); int {var}_cols = scanner.nextInt(); int[][] {var} = new int[{var}_rows][{var}_cols]; for (int i = 0; i < {var}_rows; i++) { for (int j = 0; j < {var}_cols; j++) { {var}[i][j] = scanner.nextInt(); } }",
+      "hint": "int[][]",
+      "selfDeclaring": true
     }
   }
 }

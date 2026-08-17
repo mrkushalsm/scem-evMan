@@ -1,44 +1,79 @@
-import { Judge, ProblemConfig, LanguageConfig } from '../types';
+import { Judge, ProblemConfig, LanguageConfig, TypeConfig } from '../types';
 import * as configFile from './config.json';
 
 const config = configFile as LanguageConfig;
 
+function extractImports(userCode: string): { imports: string[]; body: string } {
+    const lines = userCode.split('\n');
+    const imports: string[] = [];
+    let inBlockComment = false;
+    let i = 0;
+
+    for (; i < lines.length; i++) {
+        let line = lines[i];
+
+        if (inBlockComment) {
+            const end = line.indexOf('*/');
+            if (end === -1) continue;
+            inBlockComment = false;
+            line = line.slice(end + 2);
+        }
+
+        const stripped = line.replace(/\/\*.*?\*\//g, '').trim();
+        if (stripped === '' || stripped.startsWith('//')) continue;
+
+        const blockStart = stripped.indexOf('/*');
+        if (blockStart !== -1) {
+            inBlockComment = true;
+            if (stripped.slice(0, blockStart).trim() === '') continue;
+            break;
+        }
+
+        if (/^import\s+[\w.]+\s*(\.\s*\*\s*)?;$/.test(stripped)) {
+            imports.push(stripped);
+            lines[i] = '';
+            continue;
+        }
+
+        break;
+    }
+
+    return { imports, body: lines.join('\n').trim() };
+}
+
 export class JudgeJava implements Judge {
+    private typeOf(type: string): TypeConfig {
+        const typeInfo = config.types[type];
+        if (!typeInfo) {
+            throw new Error(`Unsupported type "${type}"`);
+        }
+        return typeInfo;
+    }
+
     wrapCode(userCode: string, problemConfig: ProblemConfig): string {
-        const template = config.template;
-        const inputReadingCode = this.generateInputReader(problemConfig);
+        const { imports, body } = extractImports(userCode);
 
-        // Extract imports
-        const importRegex = /^\s*import\s+[\w.]+.*;/gm;
-        const imports = (userCode.match(importRegex) || []).join('\n');
-        const codeWithoutImports = userCode.replace(importRegex, '').trim();
+        const finalCode = config.template
+            .split('{code}').join(body)
+            .split('{input_reading_code}').join(this.generateInputReader(problemConfig));
 
-        const finalCode = template
-            .replace('{code}', codeWithoutImports)
-            .replace('{input_reading_code}', inputReadingCode);
-
-        return imports + '\n' + finalCode;
+        return imports.join('\n') + '\n' + finalCode;
     }
 
     generateInputReader(problemConfig: ProblemConfig): string {
         const lines: string[] = [];
         const variables: string[] = [];
-        const indent = "        ";
-        const typeConfig = config.types;
+        const indent = '        ';
 
-        if (problemConfig.input && Array.isArray(problemConfig.input)) {
-            for (const param of problemConfig.input) {
-                const typeConf = typeConfig[param.type];
-                if (typeConf && typeConf.reader) {
-                    const reader = typeConf.reader.split('{var}').join(param.variable);
-                    if (param.type.includes('array')) {
-                        lines.push(`${indent}${reader}`);
-                    } else {
-                        lines.push(`${indent}${typeConf.hint} ${param.variable} = ${reader};`);
-                    }
-                }
-                variables.push(param.variable);
-            }
+        for (const param of problemConfig.input || []) {
+            const typeInfo = this.typeOf(param.type);
+            const reader = typeInfo.reader.split('{var}').join(param.variable);
+            lines.push(
+                typeInfo.selfDeclaring
+                    ? `${indent}${reader}`
+                    : `${indent}${typeInfo.hint} ${param.variable} = ${reader};`
+            );
+            variables.push(param.variable);
         }
 
         if (problemConfig.method) {
@@ -50,18 +85,12 @@ export class JudgeJava implements Judge {
 
     generateBoilerplate(problemConfig: ProblemConfig): string {
         const method = problemConfig.method || 'solve';
-        const args: string[] = [];
-        const typeConfig = config.types;
-
-        if (problemConfig.input && Array.isArray(problemConfig.input)) {
-            for (const param of problemConfig.input) {
-                const typeInfo = typeConfig[param.type] || { hint: 'void', reader: '' };
-                args.push(`${typeInfo.hint} ${param.variable}`);
-            }
-        }
+        const args = (problemConfig.input || []).map(
+            (param) => `${this.typeOf(param.type).hint} ${param.variable}`
+        );
 
         return config.boilerplate
-            .replace('{method}', method)
-            .replace('{args}', args.join(', '));
+            .split('{method}').join(method)
+            .split('{args}').join(args.join(', '));
     }
 }

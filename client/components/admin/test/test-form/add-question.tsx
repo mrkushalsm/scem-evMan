@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Plus, Settings } from "lucide-react";
-// import { problems } from "@/constants/test-data"; // Removed hardcoded data
 import QuestionCard from "../../question/question-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";

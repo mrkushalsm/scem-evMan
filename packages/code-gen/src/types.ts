@@ -1,6 +1,8 @@
 export interface TypeConfig {
     reader: string;
     hint: string;
+    sizeParams?: string[];
+    selfDeclaring?: boolean;
 }
 
 export interface LanguageConfig {

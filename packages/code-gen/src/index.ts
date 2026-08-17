@@ -20,3 +20,4 @@ export function getJudge(lang: string): Judge {
 }
 
 export * from "./types";
+export * from "./validate";

@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { SUPPORTED_TYPES, validateProblemConfig } = require("@pomelo/code-gen");
 
 // Base schema for all questions
 const baseQuestionSchema = z.object({
@@ -14,15 +15,7 @@ const baseQuestionSchema = z.object({
 // Input variable schema
 const inputVariableSchema = z.object({
   variable: z.string().min(1, "Variable name is required"),
-  type: z.enum([
-    "int",
-    "float",
-    "char",
-    "string",
-    "int_array",
-    "float_array",
-    "string_array",
-  ]),
+  type: z.enum(SUPPORTED_TYPES),
 });
 
 // Test case schema
@@ -47,6 +40,17 @@ const codingQuestionSchema = baseQuestionSchema.extend({
     .array(inputVariableSchema)
     .min(1, "At least one input variable is required"),
   testcases: z.array(testCaseSchema).optional(),
+}).superRefine((coding, ctx) => {
+  validateProblemConfig({
+    method: coding.functionName,
+    input: coding.inputVariables,
+  }).forEach((message) => {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["inputVariables"],
+      message,
+    });
+  });
 });
 
 // MCQ question schema

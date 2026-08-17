@@ -1,4 +1,5 @@
 // Client-side validation utilities for the bulk import dialog
+import { validateProblemConfig, type ProblemInput } from '@pomelo/code-gen';
 
 export interface ClientValidationError {
   field?: string;
@@ -114,21 +115,12 @@ export function validateImportJSONClient(jsonString: string): ClientValidationRe
         });
       }
 
-      if (!q.functionName || typeof q.functionName !== 'string') {
-        errors.push({
-          index: idx,
-          field: 'functionName',
-          message: 'Coding question missing "functionName"',
-        });
-      }
-
-      if (!q.inputVariables || !Array.isArray(q.inputVariables) || q.inputVariables.length === 0) {
-        errors.push({
-          index: idx,
-          field: 'inputVariables',
-          message: 'Coding question missing "inputVariables" (must be non-empty array)',
-        });
-      }
+      validateProblemConfig({
+        method: q.functionName as string,
+        input: (Array.isArray(q.inputVariables) ? q.inputVariables : []) as ProblemInput[],
+      }).forEach((message) => {
+        errors.push({ index: idx, field: 'inputVariables', message });
+      });
     } else if (q.type === 'mcq') {
       if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
         errors.push({

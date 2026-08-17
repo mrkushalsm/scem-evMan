@@ -7,9 +7,21 @@
       "reader": "cin >> {var};",
       "hint": "int"
     },
+    "long": {
+      "reader": "cin >> {var};",
+      "hint": "long long"
+    },
     "float": {
       "reader": "cin >> {var};",
       "hint": "double"
+    },
+    "double": {
+      "reader": "cin >> {var};",
+      "hint": "double"
+    },
+    "bool": {
+      "reader": "cin >> {var};",
+      "hint": "bool"
     },
     "char": {
       "reader": "cin >> {var};",
@@ -20,16 +32,24 @@
       "hint": "string"
     },
     "int_array": {
-      "reader": "cin >> {var}_size; for(int i=0; i<{var}_size; i++) { cin >> {var}[i]; }",
-      "hint": "int*"
+      "reader": "int {var}_size; cin >> {var}_size; vector<int> {var}({var}_size); for (auto &e : {var}) cin >> e;",
+      "hint": "vector<int>&",
+      "selfDeclaring": true
     },
     "float_array": {
-      "reader": "cin >> {var}_size; for(int i=0; i<{var}_size; i++) { cin >> {var}[i]; }",
-      "hint": "double*"
+      "reader": "int {var}_size; cin >> {var}_size; vector<double> {var}({var}_size); for (auto &e : {var}) cin >> e;",
+      "hint": "vector<double>&",
+      "selfDeclaring": true
     },
     "string_array": {
-      "reader": "cin >> {var}_size; for(int i=0; i<{var}_size; i++) { cin >> {var}[i]; }",
-      "hint": "string*"
+      "reader": "int {var}_size; cin >> {var}_size; vector<string> {var}({var}_size); for (auto &e : {var}) cin >> e;",
+      "hint": "vector<string>&",
+      "selfDeclaring": true
+    },
+    "int_matrix": {
+      "reader": "int {var}_rows, {var}_cols; cin >> {var}_rows >> {var}_cols; vector<vector<int>> {var}({var}_rows, vector<int>({var}_cols)); for (auto &r : {var}) for (auto &e : r) cin >> e;",
+      "hint": "vector<vector<int>>&",
+      "selfDeclaring": true
     }
   }
 }

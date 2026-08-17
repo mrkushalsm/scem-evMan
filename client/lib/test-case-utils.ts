@@ -1,8 +1,14 @@
 
 export interface InputVariable {
     variable: string;
-    type: string; // "int" | "float" | "char" | "string" | "int_array" | ...
+    type: string;
 }
+
+const toBoolToken = (val: unknown): string => {
+    if (typeof val === "boolean") return val ? "1" : "0";
+    const text = String(val ?? "").trim().toLowerCase();
+    return text === "true" || text === "1" ? "1" : "0";
+};
 
 export function serializeInput(
     inputValues: Record<string, unknown>,
@@ -15,29 +21,25 @@ export function serializeInput(
     for (const v of variables) {
         const val = inputValues[v.variable];
 
-        // Handle Arrays (int_array, float_array, string_array)
-        if (v.type.includes("_array")) {
-            // Expecting array or comma-separated string (if coming from raw input)
+        if (v.type.endsWith("_matrix")) {
+            const rows: unknown[][] = Array.isArray(val)
+                ? val.map((r) => (Array.isArray(r) ? r : []))
+                : [];
+            parts.push(String(rows.length), String(rows[0]?.length ?? 0));
+            rows.forEach((row) => row.forEach((item) => parts.push(String(item))));
+        } else if (v.type.endsWith("_array")) {
             let arr: unknown[] = [];
             if (Array.isArray(val)) {
                 arr = val;
-            } else if (typeof val === 'string') {
-                // Attempt to parse "1,2,3" if user typed format was weird, but UI gives array?
-                // Actually UI input (Input component) returns string usually? 
-                // Wait, TestCaseCard uses Input box. User types "1,2,3"? 
-                // My previous logic allowed z.any().
-                // If user types "1,2,3" in Input, val is "1,2,3".
-                // We should split by comma to treat as array elements.
-                arr = val.split(',').map(s => s.trim()).filter(s => s !== "");
+            } else if (typeof val === "string") {
+                arr = val.split(",").map((s) => s.trim()).filter((s) => s !== "");
             }
 
-            // Append size
             parts.push(String(arr.length));
-            // Append elements
-            arr.forEach(item => parts.push(String(item)));
-
+            arr.forEach((item) => parts.push(String(item)));
+        } else if (v.type === "bool") {
+            parts.push(toBoolToken(val));
         } else {
-            // Scalar types (int, float, char, string)
             parts.push(String(val ?? ""));
         }
     }
@@ -52,20 +54,32 @@ export function deserializeInput(
     const result: Record<string, unknown> = {};
     if (!serialized || !variables || variables.length === 0) return result;
 
-    // Split by whitespace
     const tokens = serialized.trim().split(/\s+/);
     let p = 0;
 
     for (const v of variables) {
         if (p >= tokens.length) break;
 
-        if (v.type.includes("_array")) {
-            // Read Size
-            const sizeStr = tokens[p++];
-            const size = parseInt(sizeStr, 10);
+        if (v.type.endsWith("_matrix")) {
+            const rows = parseInt(tokens[p++], 10);
+            const cols = parseInt(tokens[p++], 10);
+            const matrix: string[][] = [];
+
+            if (!isNaN(rows) && !isNaN(cols)) {
+                for (let i = 0; i < rows; i++) {
+                    const row: string[] = [];
+                    for (let j = 0; j < cols && p < tokens.length; j++) {
+                        row.push(tokens[p++]);
+                    }
+                    matrix.push(row);
+                }
+            }
+
+            result[v.variable] = matrix;
+        } else if (v.type.endsWith("_array")) {
+            const size = parseInt(tokens[p++], 10);
 
             if (isNaN(size)) {
-                console.error(`Invalid size for array ${v.variable}: ${sizeStr}`);
                 result[v.variable] = [];
                 continue;
             }
@@ -79,9 +93,7 @@ export function deserializeInput(
 
             result[v.variable] = elements;
         } else {
-            // Scalar
-            const val = tokens[p++];
-            result[v.variable] = val;
+            result[v.variable] = tokens[p++];
         }
     }
 

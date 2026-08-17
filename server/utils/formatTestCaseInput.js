@@ -4,7 +4,7 @@
 
 const formatValue = (value) => {
   if (Array.isArray(value)) {
-    return `[${value.join(', ')}]`;
+    return `[${value.map(formatValue).join(', ')}]`;
   }
   return String(value ?? '');
 };
@@ -21,7 +21,21 @@ const parseStringInput = (input, inputVariables) => {
   for (const v of inputVariables) {
     if (p >= tokens.length) break;
 
-    if (v.type && v.type.includes('_array')) {
+    if (v.type && v.type.endsWith('_matrix')) {
+      const rows = parseInt(tokens[p++], 10);
+      const cols = parseInt(tokens[p++], 10);
+      const matrix = [];
+      if (!isNaN(rows) && !isNaN(cols)) {
+        for (let i = 0; i < rows; i++) {
+          const row = [];
+          for (let j = 0; j < cols && p < tokens.length; j++) {
+            row.push(tokens[p++]);
+          }
+          matrix.push(row);
+        }
+      }
+      result[v.variable] = matrix;
+    } else if (v.type && v.type.includes('_array')) {
       const size = parseInt(tokens[p++], 10);
       const elements = [];
       if (!isNaN(size)) {

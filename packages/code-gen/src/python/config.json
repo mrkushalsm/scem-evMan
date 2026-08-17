@@ -7,9 +7,21 @@
       "reader": "int(next(iterator))",
       "hint": "int"
     },
+    "long": {
+      "reader": "int(next(iterator))",
+      "hint": "int"
+    },
     "float": {
       "reader": "float(next(iterator))",
       "hint": "float"
+    },
+    "double": {
+      "reader": "float(next(iterator))",
+      "hint": "float"
+    },
+    "bool": {
+      "reader": "bool(int(next(iterator)))",
+      "hint": "bool"
     },
     "char": {
       "reader": "next(iterator)",
@@ -30,6 +42,11 @@
     "string_array": {
       "reader": "[next(iterator) for _ in range(int(next(iterator)))]",
       "hint": "list[str]"
+    },
+    "int_matrix": {
+      "reader": "{var}_rows = int(next(iterator)); {var}_cols = int(next(iterator)); {var} = [[int(next(iterator)) for _ in range({var}_cols)] for _ in range({var}_rows)]",
+      "hint": "list[list[int]]",
+      "selfDeclaring": true
     }
   }
 }

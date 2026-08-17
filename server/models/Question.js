@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { SUPPORTED_TYPES } = require('@pomelo/code-gen');
 
 const questionSchema = new mongoose.Schema({
   type: {
@@ -37,7 +38,7 @@ const questionSchema = new mongoose.Schema({
     variable: String,
     type: {
       type: String,
-      enum: ['int', 'float', 'char', 'string', 'int_array', 'float_array', 'string_array']
+      enum: SUPPORTED_TYPES
     }
   }],
   testcases: [{

@@ -45,9 +45,19 @@ const buildStdin = (question, tc) => {
             if (value === undefined) {
                 throw new Error(`test case is missing a value for "${inputVar.variable}"`);
             }
-            if (Array.isArray(value)) {
+            if (inputVar.type && inputVar.type.endsWith("_matrix")) {
+                const rows = Array.isArray(value) ? value : [];
+                const cols = rows.length > 0 ? rows[0].length : 0;
+                if (rows.some((row) => !Array.isArray(row) || row.length !== cols)) {
+                    throw new Error(`matrix "${inputVar.variable}" has rows of differing lengths`);
+                }
+                values.push(rows.length, cols);
+                values.push(...rows.flat());
+            } else if (Array.isArray(value)) {
                 values.push(value.length);
                 values.push(...value);
+            } else if (typeof value === "boolean") {
+                values.push(value ? 1 : 0);
             } else {
                 values.push(value);
             }

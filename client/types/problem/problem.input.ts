@@ -1,4 +1,5 @@
 import z from "zod/v3";
+import { SUPPORTED_TYPES, validateProblemConfig } from "@pomelo/code-gen";
 // import { BaseProblem, CodingProblem, MCQProblem } from "./problem.types";
 
 // type CreateFrom<T extends BaseProblem> = Omit<T, "id">;
@@ -30,15 +31,7 @@ const codingSchema = z.object({
     .array(
       z.object({
         variable: z.string().min(1, "Variable name is required"),
-        type: z.enum([
-          "int",
-          "float",
-          "char",
-          "string",
-          "int_array",
-          "float_array",
-          "string_array",
-        ]),
+        type: z.enum(SUPPORTED_TYPES),
       })
     )
     .min(1, "At least one input variable is required"),
@@ -75,9 +68,20 @@ const mcqSchema = z.object({
     .min(1, "Please select at least one correct option."),
 });
 
-export const questionSchema = z.discriminatedUnion("type", [
-  codingSchema,
-  mcqSchema,
-]);
+export const questionSchema = z
+  .discriminatedUnion("type", [codingSchema, mcqSchema])
+  .superRefine((question, ctx) => {
+    if (question.type !== "coding") return;
+    validateProblemConfig({
+      method: question.functionName,
+      input: question.inputVariables,
+    }).forEach((message) => {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["inputVariables"],
+        message,
+      });
+    });
+  });
 
 export type QuestionSchema = z.infer<typeof questionSchema>;

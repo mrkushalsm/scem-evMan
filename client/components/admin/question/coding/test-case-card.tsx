@@ -26,16 +26,107 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Beaker, Plus, Trash2, Code2 } from "lucide-react";
+import { SUPPORTED_TYPES, validateProblemConfig } from "@pomelo/code-gen";
 
-const SUPPORTED_TYPES = [
-    "int",
-    "float",
-    "char",
-    "string",
-    "int_array",
-    "float_array",
-    "string_array",
-];
+function ElementList({
+    value,
+    onChange,
+    label,
+}: {
+    value: unknown;
+    onChange: (next: string[]) => void;
+    label: string;
+}) {
+    const arr: string[] = Array.isArray(value) ? value : [];
+    return (
+        <div className="space-y-1.5">
+            {arr.map((elem, eIdx) => (
+                <div key={eIdx} className="flex gap-1.5">
+                    <Input
+                        value={elem ?? ""}
+                        onChange={(e) => {
+                            const next = [...arr];
+                            next[eIdx] = e.target.value;
+                            onChange(next);
+                        }}
+                        className="h-8 text-sm flex-1"
+                        placeholder={`${label} ${eIdx + 1}`}
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => onChange(arr.filter((_, i) => i !== eIdx))}
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            ))}
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs mt-1"
+                onClick={() => onChange([...arr, ""])}
+            >
+                <Plus className="h-3 w-3 mr-1" /> Add {label}
+            </Button>
+        </div>
+    );
+}
+
+function MatrixEditor({
+    value,
+    onChange,
+}: {
+    value: unknown;
+    onChange: (next: string[][]) => void;
+}) {
+    const rows: string[][] = Array.isArray(value)
+        ? value.map((r) => (Array.isArray(r) ? r : []))
+        : [];
+    const width = rows[0]?.length ?? 0;
+
+    return (
+        <div className="space-y-2">
+            {rows.map((row, rIdx) => (
+                <div key={rIdx} className="p-2 border rounded-md space-y-1.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Row {rIdx + 1}</span>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            onClick={() => onChange(rows.filter((_, i) => i !== rIdx))}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                    <ElementList
+                        value={row}
+                        onChange={(next) => {
+                            const updated = [...rows];
+                            updated[rIdx] = next;
+                            onChange(updated);
+                        }}
+                        label="Column"
+                    />
+                </div>
+            ))}
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-xs"
+                onClick={() => onChange([...rows, Array.from({ length: width }, () => "")])}
+            >
+                <Plus className="h-3 w-3 mr-1" /> Add Row
+            </Button>
+        </div>
+    );
+}
 
 export default function TestCaseCard() {
     const { control, watch } = useFormContext();
@@ -59,14 +150,13 @@ export default function TestCaseCard() {
     });
 
     const inputVariables = watch("inputVariables") || [];
+    const functionName = watch("functionName");
 
-    const hasDuplicateVariables = inputVariables.some((v: { variable: string }, i: number) => {
-        const trimmed = v.variable?.trim();
-        return trimmed && inputVariables.findIndex((v2: { variable: string }) => v2.variable?.trim() === trimmed) !== i;
+    const signatureErrors = validateProblemConfig({
+        method: functionName,
+        input: inputVariables,
     });
-    
-    const isMissingNames = inputVariables.some((v: { variable: string }) => !v.variable?.trim());
-    const isVariableInvalid = isMissingNames || hasDuplicateVariables;
+    const isVariableInvalid = signatureErrors.length > 0;
 
     return (
         <div className="space-y-6">
@@ -171,11 +261,11 @@ export default function TestCaseCard() {
                                 No input variables defined.
                             </p>
                         )}
-                        {hasDuplicateVariables && (
-                            <p className="text-sm text-destructive mt-2 font-medium">
-                                Duplicate variable names are not allowed.
+                        {variableFields.length > 0 && signatureErrors.map((message) => (
+                            <p key={message} className="text-sm text-destructive mt-2 font-medium">
+                                {message}
                             </p>
-                        )}
+                        ))}
                     </div>
                     {testCaseFields.length > 0 && (
                         <p className="text-sm text-yellow-600 dark:text-yellow-500 bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded border border-yellow-200 dark:border-yellow-800">
@@ -204,12 +294,12 @@ export default function TestCaseCard() {
                     ) : (
                         <>
                             <div className="flex justify-end gap-2 items-center flex-wrap">
-                                {isMissingNames && (
+                                {isVariableInvalid && (
                                     <span className="text-xs text-destructive">
-                                        Name all variables to add test cases
+                                        Fix the function signature to add test cases
                                     </span>
                                 )}
-                                
+
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -275,47 +365,17 @@ export default function TestCaseCard() {
                                                             <FormItem>
                                                                 <FormLabel className="text-xs">{variable.variable} <span className="text-muted-foreground font-normal">({variable.type})</span></FormLabel>
                                                                 <FormControl>
-                                                                    {variable.type.includes("_array") ? (
-                                                                        <div className="space-y-1.5">
-                                                                            {(Array.isArray(field.value) ? field.value : []).map((elem: string, eIdx: number) => {
-                                                                                const arr: string[] = Array.isArray(field.value) ? field.value : [];
-                                                                                return (
-                                                                                    <div key={eIdx} className="flex gap-1.5">
-                                                                                        <Input
-                                                                                            value={elem}
-                                                                                            onChange={e => {
-                                                                                                const next = [...arr];
-                                                                                                next[eIdx] = e.target.value;
-                                                                                                field.onChange(next);
-                                                                                            }}
-                                                                                            className="h-8 text-sm flex-1"
-                                                                                            placeholder={`Element ${eIdx + 1}`}
-                                                                                        />
-                                                                                        <Button
-                                                                                            type="button"
-                                                                                            variant="ghost"
-                                                                                            size="icon"
-                                                                                            className="h-8 w-8 text-destructive"
-                                                                                            onClick={() => field.onChange(arr.filter((_, i) => i !== eIdx))}
-                                                                                        >
-                                                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                                                        </Button>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                className="w-full h-7 text-xs mt-1"
-                                                                                onClick={() => {
-                                                                                    const arr: string[] = Array.isArray(field.value) ? field.value : [];
-                                                                                    field.onChange([...arr, ""]);
-                                                                                }}
-                                                                            >
-                                                                                <Plus className="h-3 w-3 mr-1" /> Add Element
-                                                                            </Button>
-                                                                        </div>
+                                                                    {variable.type.endsWith("_matrix") ? (
+                                                                        <MatrixEditor
+                                                                            value={field.value}
+                                                                            onChange={field.onChange}
+                                                                        />
+                                                                    ) : variable.type.endsWith("_array") ? (
+                                                                        <ElementList
+                                                                            value={field.value}
+                                                                            onChange={field.onChange}
+                                                                            label="Element"
+                                                                        />
                                                                     ) : (
                                                                         <Input {...field} value={field.value ?? ""} placeholder={`Value for ${variable.variable}`} className="h-8 text-sm" />
                                                                     )}

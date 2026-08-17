@@ -21,7 +21,6 @@ export interface CodingProblem extends BaseProblem {
     c?: string;
     java?: string;
     python?: string;
-    javascript?: string;
   };
   examples?: {
     input: string;
