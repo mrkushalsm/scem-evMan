@@ -163,7 +163,7 @@ export default function TestCasePanel({
                   {results[activeTestCase].input && (
                     <div className="space-y-1.5">
                       <Label className="text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">Input</Label>
-                      <pre className="bg-muted px-4 py-3 rounded-lg font-mono text-[13px] overflow-x-auto border border-border/50">
+                      <pre className="bg-muted px-4 py-3 rounded-lg font-mono text-[13px] whitespace-pre-wrap break-words border border-border/50">
                         {results[activeTestCase].input}
                       </pre>
                     </div>
@@ -172,7 +172,7 @@ export default function TestCasePanel({
                   {results[activeTestCase].expectedOutput && (
                     <div className="space-y-1.5">
                       <Label className="text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">Expected Output</Label>
-                      <pre className="bg-muted px-4 py-3 rounded-lg font-mono text-[13px] overflow-x-auto border border-border/50">
+                      <pre className="bg-muted px-4 py-3 rounded-lg font-mono text-[13px] whitespace-pre-wrap break-words border border-border/50">
                         {results[activeTestCase].expectedOutput}
                       </pre>
                     </div>
@@ -181,8 +181,8 @@ export default function TestCasePanel({
                   {results[activeTestCase].actualOutput !== undefined && (
                     <div className="space-y-1.5">
                       <Label className="text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">Your Output</Label>
-                      <pre className="bg-muted px-4 py-3 rounded-lg font-mono text-[13px] overflow-x-auto border border-border/50">
-                        {results[activeTestCase].actualOutput !== "" 
+                      <pre className="bg-muted px-4 py-3 rounded-lg font-mono text-[13px] whitespace-pre-wrap break-words border border-border/50">
+                        {results[activeTestCase].actualOutput !== ""
                           ? results[activeTestCase].actualOutput 
                           : <span className="text-muted-foreground italic">No output</span>}
                       </pre>
