@@ -333,6 +333,18 @@ const endTest = async (req, res, next) => {
             return res.status(404).json({ success: false, error: 'Submission session not found. Did you start the test?' });
         }
 
+        // Submitting is one-time: the first end wins. Without this, a later call could
+        // move submittedAt forward, and one with an empty body would clear the
+        // forcedSubmission flag set by an integrity auto-submit.
+        if (submission.status === 'Completed') {
+            console.log("EndTest: Already completed, nothing to do");
+            return res.json({
+                success: true,
+                message: 'Test already submitted',
+                forcedSubmission: Boolean(submission.forcedSubmission)
+            });
+        }
+
         console.log("EndTest: Marking submission as completed");
         submission.status = 'Completed';
         submission.submittedAt = new Date();

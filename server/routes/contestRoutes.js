@@ -51,7 +51,7 @@ router.post('/:id/run', requireAuth(), submissionLimiter, validateContest({ chec
 router.post('/:id/submit', requireAuth(), submissionLimiter, validateContest({ checkStarted: true, checkEnded: true, checkAttemptStatus: 'NotCompleted' }), submitCode);
 
 // End Test
-router.post('/:id/end', requireAuth(), submissionLimiter, validateContest({ checkStarted: true }), endTest);
+router.post('/:id/end', requireAuth(), validateContest({ checkStarted: true }), endTest);
 
 // Save MCQ Answer - Must be not completed
 router.post('/:id/mcq', requireAuth(), mcqLimiter, validateContest({ checkStarted: true, checkEnded: true, checkAttemptStatus: 'NotCompleted' }), saveMCQ);
